@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Main experiment: train all column-parallel variants and compare against dense baseline."""
+
+import argparse
+import json
+import os
+
+from column_transformer.config import DenseConfig, ColumnConfig, EXPERIMENTS
+from column_transformer.model_dense import DenseTransformer
+from column_transformer.model_column import ColumnTransformer
+from column_transformer.data import load_wikitext
+from column_transformer.train import train, count_parameters
+from column_transformer.evaluate import print_comparison
+from column_transformer.visualize import plot_training_curves, plot_final_comparison
+
+
+def build_model(name: str, config):
+    if isinstance(config, DenseConfig):
+        return DenseTransformer(config)
+    else:
+        return ColumnTransformer(config)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Column-Parallel Transformer Experiment")
+    parser.add_argument("--max-steps", type=int, default=20000, help="Training steps per model")
+    parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
+    parser.add_argument("--seq-len", type=int, default=512, help="Sequence length")
+    parser.add_argument("--lr", type=float, default=3e-4, help="Peak learning rate")
+    parser.add_argument("--eval-every", type=int, default=500, help="Evaluate every N steps")
+    parser.add_argument("--models", nargs="+", default=None,
+                        help="Which models to train (default: all). "
+                             "Options: dense, column_merge_2, column_merge_4, column_no_merge")
+    parser.add_argument("--results-dir", type=str, default="results", help="Output directory")
+    args = parser.parse_args()
+
+    os.makedirs(args.results_dir, exist_ok=True)
+    os.makedirs("checkpoints", exist_ok=True)
+
+    # Select which models to train
+    model_names = args.models or list(EXPERIMENTS.keys())
+
+    # Print experiment overview
+    print("=" * 60)
+    print("COLUMN-PARALLEL TRANSFORMER EXPERIMENT")
+    print("=" * 60)
+    for name in model_names:
+        config = EXPERIMENTS[name]
+        model = build_model(name, config)
+        print(f"  {name}: {count_parameters(model):,} params")
+        del model
+    print(f"  Training: {args.max_steps} steps, batch {args.batch_size}, seq {args.seq_len}")
+    print("=" * 60)
+
+    # Load data once (shared by all models)
+    train_loader, val_loader = load_wikitext(
+        seq_len=args.seq_len, batch_size=args.batch_size
+    )
+
+    # Train each model
+    all_results = []
+    for name in model_names:
+        config = EXPERIMENTS[name]
+        model = build_model(name, config)
+        result = train(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            max_steps=args.max_steps,
+            lr=args.lr,
+            eval_every=args.eval_every,
+            model_name=name,
+            save_dir="checkpoints",
+        )
+        all_results.append(result)
+        # Free GPU memory between models
+        del model
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    # Print comparison
+    print_comparison(all_results)
+
+    # Generate plots
+    plot_training_curves(all_results, save_dir=args.results_dir)
+    plot_final_comparison(all_results, save_dir=args.results_dir)
+
+    # Save raw results
+    serializable = []
+    for r in all_results:
+        serializable.append({
+            "model_name": r["model_name"],
+            "params": r["params"],
+            "best_val_loss": r["best_val_loss"],
+            "total_time": r["total_time"],
+            "val_perplexities": r["val_perplexities"],
+        })
+    with open(os.path.join(args.results_dir, "results.json"), "w") as f:
+        json.dump(serializable, f, indent=2)
+    print(f"\nResults saved to {args.results_dir}/")
+
+
+if __name__ == "__main__":
+    main()
