@@ -121,9 +121,16 @@ def train(
     total_time = time.time() - t_start
     print(f"  [{model_name}] Finished in {total_time/60:.1f} min | best val_loss {best_val_loss:.4f}")
 
+    n_params = count_parameters(model)
+    # Move model to CPU to free GPU memory before next model
+    model.cpu()
+    del optimizer
+    import gc; gc.collect()
+    torch.cuda.empty_cache()
+
     return {
         "model_name": model_name,
-        "params": count_parameters(model),
+        "params": n_params,
         "train_losses": train_losses,
         "val_perplexities": val_perplexities,
         "best_val_loss": best_val_loss,

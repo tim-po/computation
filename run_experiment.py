@@ -75,9 +75,11 @@ def main():
         all_results.append(result)
         # Free GPU memory between models
         del model
-        import torch
+        import torch, gc
+        gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+            torch.cuda.reset_peak_memory_stats()
 
     # Print comparison
     print_comparison(all_results)
