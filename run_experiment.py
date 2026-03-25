@@ -5,9 +5,10 @@ import argparse
 import json
 import os
 
-from column_transformer.config import DenseConfig, ColumnConfig, EXPERIMENTS
+from column_transformer.config import DenseConfig, ColumnConfig, ColumnConfigV2, EXPERIMENTS
 from column_transformer.model_dense import DenseTransformer
 from column_transformer.model_column import ColumnTransformer
+from column_transformer.model_column_v2 import ColumnTransformerV2
 from column_transformer.data import load_wikitext
 from column_transformer.train import train, count_parameters
 from column_transformer.evaluate import print_comparison
@@ -17,6 +18,8 @@ from column_transformer.visualize import plot_training_curves, plot_final_compar
 def build_model(name: str, config):
     if isinstance(config, DenseConfig):
         return DenseTransformer(config)
+    elif isinstance(config, ColumnConfigV2):
+        return ColumnTransformerV2(config)
     else:
         return ColumnTransformer(config)
 

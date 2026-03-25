@@ -54,10 +54,69 @@ class ColumnConfig:
         return emb + proj + col_attn + col_ffn + merge + out_head
 
 
+@dataclass
+class ColumnConfigV2:
+    """V2 column config: shared trunk layers + cross-column attention merges."""
+    vocab_size: int = 50257
+    d_model: int = 512          # shared embedding & trunk dim
+    n_trunk_layers: int = 3     # shared trunk layers (full d_model width)
+    trunk_n_heads: int = 8      # attention heads in trunk
+    trunk_d_ff: int = 2048      # FFN dim in trunk
+    n_columns: int = 4          # columns after trunk
+    d_col: int = 256            # per-column hidden dim
+    n_col_layers: int = 5       # column layers after trunk (total = trunk + col = 8)
+    n_heads: int = 4            # heads per column
+    d_ff: int = 1024            # FFN dim per column
+    n_cross_heads: int = 4      # heads in cross-column attention
+    max_seq_len: int = 512
+    merge_every: int = 2        # cross-attn merge frequency within column layers
+    dropout: float = 0.1
+
+    @property
+    def head_dim(self) -> int:
+        return self.d_col // self.n_heads
+
+    @property
+    def total_col_dim(self) -> int:
+        return self.n_columns * self.d_col
+
+    @property
+    def total_layers(self) -> int:
+        return self.n_trunk_layers + self.n_col_layers
+
+    def param_estimate(self) -> int:
+        emb = self.vocab_size * self.d_model
+        # Trunk params
+        trunk_attn = 4 * self.d_model * self.d_model * self.n_trunk_layers
+        trunk_ffn = 3 * self.d_model * self.trunk_d_ff * self.n_trunk_layers
+        # Column projections
+        proj = self.n_columns * self.d_model * self.d_col  # in only (out is concat->proj)
+        out_proj = self.total_col_dim * self.d_model
+        # Column params
+        col_attn = 4 * self.d_col * self.d_col * self.n_col_layers * self.n_columns
+        col_ffn = 3 * self.d_col * self.d_ff * self.n_col_layers * self.n_columns
+        # Cross-column attention merges
+        n_merges = self.n_col_layers // self.merge_every if self.merge_every > 0 else 0
+        # Each merge: shared K,V projections + per-column Q,O projections
+        merge_shared = n_merges * 2 * self.total_col_dim * self.d_col  # K, V
+        merge_percol = n_merges * self.n_columns * 2 * self.d_col * self.d_col  # Q, O per col
+        return emb + trunk_attn + trunk_ffn + proj + out_proj + col_attn + col_ffn + merge_shared + merge_percol
+
+
 # Preset experiment configs
 EXPERIMENTS = {
     "dense": DenseConfig(),
     "column_merge_2": ColumnConfig(merge_every=2),
     "column_merge_4": ColumnConfig(merge_every=4),
     "column_no_merge": ColumnConfig(merge_every=0),
+    # V2: shared trunk + cross-column attention
+    "v2_trunk3_xattn2": ColumnConfigV2(
+        n_trunk_layers=3, n_col_layers=5, merge_every=2,
+    ),
+    "v2_trunk2_xattn2": ColumnConfigV2(
+        n_trunk_layers=2, n_col_layers=6, merge_every=2,
+    ),
+    "v2_trunk3_xattn1": ColumnConfigV2(
+        n_trunk_layers=3, n_col_layers=5, merge_every=1,
+    ),
 }
