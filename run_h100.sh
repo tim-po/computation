@@ -33,14 +33,17 @@ echo "=== PHASE 1: Training all models ==="
 echo ""
 
 # Train dense baseline + all 3 column variants
-# batch 16 × 4 accum = effective batch 64, fits in 80GB VRAM
+# bf16 + compile for ~5-6x speedup on H100
+# batch 32 × 2 accum = effective batch 64
 python run_experiment.py \
     --max-steps 30000 \
-    --batch-size 16 \
-    --grad-accum 4 \
+    --batch-size 32 \
+    --grad-accum 2 \
     --seq-len 1024 \
     --lr 3e-4 \
     --eval-every 1000 \
+    --bf16 \
+    --compile \
     --models h100_dense h100_col8_drop0 h100_col8_drop25 h100_col8_drop50
 
 # --- Phase 2: Degradation evaluation ---

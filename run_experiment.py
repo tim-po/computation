@@ -36,6 +36,8 @@ def main():
                              "Options: dense, column_merge_2, column_merge_4, column_no_merge")
     parser.add_argument("--grad-accum", type=int, default=1,
                         help="Gradient accumulation steps (effective batch = batch-size * grad-accum)")
+    parser.add_argument("--bf16", action="store_true", help="Use bfloat16 mixed precision")
+    parser.add_argument("--compile", action="store_true", help="Use torch.compile")
     parser.add_argument("--results-dir", type=str, default="results", help="Output directory")
     args = parser.parse_args()
 
@@ -78,6 +80,8 @@ def main():
             model_name=name,
             save_dir="checkpoints",
             grad_accum_steps=args.grad_accum,
+            use_bf16=args.bf16,
+            use_compile=getattr(args, 'compile', False),
         )
         all_results.append(result)
         # Free GPU memory between models

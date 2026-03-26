@@ -35,6 +35,8 @@ def train(
     model_name: str = "model",
     save_dir: str = "checkpoints",
     grad_accum_steps: int = 1,
+    use_bf16: bool = False,
+    use_compile: bool = False,
 ):
     device = get_device()
     print(f"\nTraining {model_name} on {device}")
@@ -42,7 +44,19 @@ def train(
     if grad_accum_steps > 1:
         print(f"  Gradient accumulation: {grad_accum_steps} steps")
 
+    # Mixed precision setup
+    amp_enabled = use_bf16 and device.type == "cuda"
+    amp_dtype = torch.bfloat16 if amp_enabled else torch.float32
+    if amp_enabled:
+        print(f"  Mixed precision: bfloat16")
+
     model = model.to(device)
+
+    # torch.compile for extra speed (H100 benefits significantly)
+    if use_compile and hasattr(torch, "compile"):
+        print(f"  torch.compile: enabled")
+        model = torch.compile(model)
+
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=lr, weight_decay=weight_decay, betas=(0.9, 0.95)
     )
@@ -72,10 +86,13 @@ def train(
             input_ids = input_ids.to(device)
             targets = targets.to(device)
 
-            # Forward
-            logits = model(input_ids)  # [B, T, vocab]
-            loss = loss_fn(logits.view(-1, logits.size(-1)), targets.view(-1))
-            loss = loss / grad_accum_steps  # scale for accumulation
+            # Forward with optional mixed precision
+            with torch.autocast(device_type=device.type, dtype=amp_dtype, enabled=amp_enabled):
+                logits = model(input_ids)  # [B, T, vocab]
+                loss = loss_fn(logits.view(-1, logits.size(-1)), targets.view(-1))
+                loss = loss / grad_accum_steps  # scale for accumulation
+
+            # bf16 doesn't need GradScaler (unlike fp16)
             loss.backward()
 
             accum_loss += loss.item()
