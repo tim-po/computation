@@ -33,9 +33,11 @@ echo "=== PHASE 1: Training all models ==="
 echo ""
 
 # Train dense baseline + all 3 column variants
+# batch 16 × 4 accum = effective batch 64, fits in 80GB VRAM
 python run_experiment.py \
     --max-steps 30000 \
-    --batch-size 64 \
+    --batch-size 16 \
+    --grad-accum 4 \
     --seq-len 1024 \
     --lr 3e-4 \
     --eval-every 1000 \

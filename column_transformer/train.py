@@ -34,10 +34,13 @@ def train(
     log_dir: str = "runs",
     model_name: str = "model",
     save_dir: str = "checkpoints",
+    grad_accum_steps: int = 1,
 ):
     device = get_device()
     print(f"\nTraining {model_name} on {device}")
     print(f"  Parameters: {count_parameters(model):,}")
+    if grad_accum_steps > 1:
+        print(f"  Gradient accumulation: {grad_accum_steps} steps")
 
     model = model.to(device)
     optimizer = torch.optim.AdamW(
@@ -56,6 +59,10 @@ def train(
     t_start = time.time()
 
     model.train()
+    micro_step = 0  # counts micro-batches within an accumulation window
+    accum_loss = 0.0
+    optimizer.zero_grad()
+
     while step < max_steps:
         epoch += 1
         for input_ids, targets in train_loader:
@@ -64,6 +71,22 @@ def train(
 
             input_ids = input_ids.to(device)
             targets = targets.to(device)
+
+            # Forward
+            logits = model(input_ids)  # [B, T, vocab]
+            loss = loss_fn(logits.view(-1, logits.size(-1)), targets.view(-1))
+            loss = loss / grad_accum_steps  # scale for accumulation
+            loss.backward()
+
+            accum_loss += loss.item()
+            micro_step += 1
+
+            if micro_step < grad_accum_steps:
+                continue
+
+            # --- Optimizer step (every grad_accum_steps micro-batches) ---
+            step += 1
+            micro_step = 0
 
             # Cosine schedule with warmup
             if step < warmup_steps:
@@ -74,31 +97,26 @@ def train(
             for pg in optimizer.param_groups:
                 pg["lr"] = cur_lr
 
-            # Forward
-            logits = model(input_ids)  # [B, T, vocab]
-            loss = loss_fn(logits.view(-1, logits.size(-1)), targets.view(-1))
-
-            # Backward
-            optimizer.zero_grad()
-            loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
             optimizer.step()
+            optimizer.zero_grad()
 
-            step += 1
-            train_losses.append((step, loss.item()))
+            train_losses.append((step, accum_loss))
 
             # Logging
             if step % 50 == 0:
-                writer.add_scalar("train/loss", loss.item(), step)
+                writer.add_scalar("train/loss", accum_loss, step)
                 writer.add_scalar("train/lr", cur_lr, step)
                 elapsed = time.time() - t_start
                 steps_per_sec = step / elapsed
                 eta = (max_steps - step) / steps_per_sec
                 print(
                     f"  [{model_name}] step {step}/{max_steps} | "
-                    f"loss {loss.item():.4f} | lr {cur_lr:.2e} | "
+                    f"loss {accum_loss:.4f} | lr {cur_lr:.2e} | "
                     f"{steps_per_sec:.1f} steps/s | ETA {eta/60:.0f}min"
                 )
+
+            accum_loss = 0.0
 
             # Evaluation
             if step % eval_every == 0 or step == max_steps:

@@ -34,6 +34,8 @@ def main():
     parser.add_argument("--models", nargs="+", default=None,
                         help="Which models to train (default: all). "
                              "Options: dense, column_merge_2, column_merge_4, column_no_merge")
+    parser.add_argument("--grad-accum", type=int, default=1,
+                        help="Gradient accumulation steps (effective batch = batch-size * grad-accum)")
     parser.add_argument("--results-dir", type=str, default="results", help="Output directory")
     args = parser.parse_args()
 
@@ -52,7 +54,8 @@ def main():
         model = build_model(name, config)
         print(f"  {name}: {count_parameters(model):,} params")
         del model
-    print(f"  Training: {args.max_steps} steps, batch {args.batch_size}, seq {args.seq_len}")
+    eff_batch = args.batch_size * args.grad_accum
+    print(f"  Training: {args.max_steps} steps, batch {args.batch_size}×{args.grad_accum}={eff_batch}, seq {args.seq_len}")
     print("=" * 60)
 
     # Load data once (shared by all models)
@@ -74,6 +77,7 @@ def main():
             eval_every=args.eval_every,
             model_name=name,
             save_dir="checkpoints",
+            grad_accum_steps=args.grad_accum,
         )
         all_results.append(result)
         # Free GPU memory between models
