@@ -56,7 +56,8 @@ class ColumnConfig:
 
 @dataclass
 class ColumnConfigV2:
-    """V2 column config: shared trunk layers + cross-column attention merges."""
+    """V2 column config: shared trunk layers + cross-column attention merges.
+    Supports column dropout for fault-tolerant distributed inference."""
     vocab_size: int = 50257
     d_model: int = 512          # shared embedding & trunk dim
     n_trunk_layers: int = 3     # shared trunk layers (full d_model width)
@@ -71,6 +72,8 @@ class ColumnConfigV2:
     max_seq_len: int = 512
     merge_every: int = 2        # cross-attn merge frequency within column layers
     dropout: float = 0.1
+    col_drop_prob: float = 0.0  # column dropout probability (0 = disabled)
+    min_active_columns: int = 1 # minimum columns kept alive during dropout
 
     @property
     def head_dim(self) -> int:
@@ -118,5 +121,14 @@ EXPERIMENTS = {
     ),
     "v2_trunk3_xattn1": ColumnConfigV2(
         n_trunk_layers=3, n_col_layers=5, merge_every=1,
+    ),
+    # V3: column dropout for fault-tolerant distributed inference
+    "v3_drop20": ColumnConfigV2(
+        n_trunk_layers=3, n_col_layers=5, merge_every=2,
+        col_drop_prob=0.2, min_active_columns=2,
+    ),
+    "v3_drop40": ColumnConfigV2(
+        n_trunk_layers=3, n_col_layers=5, merge_every=2,
+        col_drop_prob=0.4, min_active_columns=1,
     ),
 }
