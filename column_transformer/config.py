@@ -122,7 +122,7 @@ EXPERIMENTS = {
     "v2_trunk3_xattn1": ColumnConfigV2(
         n_trunk_layers=3, n_col_layers=5, merge_every=1,
     ),
-    # V3: column dropout for fault-tolerant distributed inference
+    # V3: column dropout for fault-tolerant distributed inference (small scale)
     "v3_drop20": ColumnConfigV2(
         n_trunk_layers=3, n_col_layers=5, merge_every=2,
         col_drop_prob=0.2, min_active_columns=2,
@@ -130,5 +130,37 @@ EXPERIMENTS = {
     "v3_drop40": ColumnConfigV2(
         n_trunk_layers=3, n_col_layers=5, merge_every=2,
         col_drop_prob=0.4, min_active_columns=1,
+    ),
+    # =====================================================================
+    # H100 SCALE: 8 columns, ~350M params
+    # Target: train on H100, inference on consumer GPUs (1-8 columns)
+    # =====================================================================
+    "h100_dense": DenseConfig(
+        d_model=1024, n_layers=16, n_heads=16, d_ff=4096,
+        max_seq_len=1024, dropout=0.1,
+    ),
+    "h100_col8_drop0": ColumnConfigV2(
+        d_model=1024,
+        n_trunk_layers=4, trunk_n_heads=16, trunk_d_ff=4096,
+        n_columns=8, d_col=256, n_col_layers=12,
+        n_heads=4, d_ff=1024, n_cross_heads=4,
+        max_seq_len=1024, merge_every=3,
+        col_drop_prob=0.0, min_active_columns=8,
+    ),
+    "h100_col8_drop25": ColumnConfigV2(
+        d_model=1024,
+        n_trunk_layers=4, trunk_n_heads=16, trunk_d_ff=4096,
+        n_columns=8, d_col=256, n_col_layers=12,
+        n_heads=4, d_ff=1024, n_cross_heads=4,
+        max_seq_len=1024, merge_every=3,
+        col_drop_prob=0.25, min_active_columns=2,
+    ),
+    "h100_col8_drop50": ColumnConfigV2(
+        d_model=1024,
+        n_trunk_layers=4, trunk_n_heads=16, trunk_d_ff=4096,
+        n_columns=8, d_col=256, n_col_layers=12,
+        n_heads=4, d_ff=1024, n_cross_heads=4,
+        max_seq_len=1024, merge_every=3,
+        col_drop_prob=0.5, min_active_columns=1,
     ),
 }
