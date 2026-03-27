@@ -92,27 +92,22 @@ class CrossColumnAttention(nn.Module):
         if col_mask is None:
             col_mask = torch.ones(self.n_columns, dtype=torch.bool, device=columns[0].device)
 
-        active_indices = col_mask.nonzero(as_tuple=True)[0]
-        n_active = len(active_indices)
+        mask_f = col_mask.float()  # [n_columns]
+        n_active = mask_f.sum().clamp(min=1.0)
 
-        # Aggregate K/V from active columns (average)
+        # Aggregate K/V from all columns, masked (avoids dynamic indexing for torch.compile)
         k_sum = torch.zeros(B, T, self.d_col, device=columns[0].device, dtype=columns[0].dtype)
         v_sum = torch.zeros_like(k_sum)
-        for i in active_indices:
+        for i in range(self.n_columns):
             normed = self.norms_kv[i](columns[i])
-            k_sum = k_sum + self.w_ks[i](normed)
-            v_sum = v_sum + self.w_vs[i](normed)
+            k_sum = k_sum + self.w_ks[i](normed) * mask_f[i]
+            v_sum = v_sum + self.w_vs[i](normed) * mask_f[i]
         k = (k_sum / n_active).view(B, T, self.n_cross_heads, self.head_dim).transpose(1, 2)
         v = (v_sum / n_active).view(B, T, self.n_cross_heads, self.head_dim).transpose(1, 2)
 
-        # Each active column queries the aggregated K/V
+        # Each column queries the aggregated K/V (dropped columns get passthrough via masking)
         outputs = []
         for i in range(self.n_columns):
-            if not col_mask[i]:
-                # Dropped column: pass through unchanged
-                outputs.append(columns[i])
-                continue
-
             q = self.w_qs[i](self.norms_q[i](columns[i]))
             q = q.view(B, T, self.n_cross_heads, self.head_dim).transpose(1, 2)
 
@@ -121,7 +116,11 @@ class CrossColumnAttention(nn.Module):
                 dropout_p=self.attn_dropout.p if self.training else 0.0,
             )
             attn_out = attn_out.transpose(1, 2).contiguous().view(B, T, self.d_col)
-            outputs.append(columns[i] + self.resid_dropout(self.w_os[i](attn_out)))
+            merged = columns[i] + self.resid_dropout(self.w_os[i](attn_out))
+
+            # Blend: active columns get merged output, dropped columns pass through
+            out = torch.where(col_mask[i], merged, columns[i])
+            outputs.append(out)
 
         return outputs
 
@@ -155,22 +154,20 @@ class ColumnDropout(nn.Module):
         # Sample which columns to keep
         mask = torch.rand(self.n_columns, device=device) >= self.drop_prob
 
-        # Guarantee minimum active columns
-        if mask.sum() < self.min_active:
-            inactive = (~mask).nonzero(as_tuple=True)[0]
-            perm = inactive[torch.randperm(len(inactive), device=device)]
-            need = self.min_active - mask.sum().item()
-            mask[perm[:need]] = True
+        # Guarantee minimum active columns — pure tensor ops (no .item()) for torch.compile
+        n_active = mask.sum()
+        if n_active < self.min_active:
+            # Randomly activate more columns from the inactive set
+            inactive_scores = torch.where(~mask, torch.rand(self.n_columns, device=device), torch.tensor(2.0, device=device))
+            _, topk_indices = inactive_scores.topk(self.min_active - n_active, largest=False)
+            mask[topk_indices] = True
 
         n_active = mask.sum().float()
         scale = self.n_columns / n_active
 
-        # Scale active columns, zero dropped ones
-        result = []
-        for i, col in enumerate(columns):
-            if mask[i]:
-                result.append(col * scale)
-            else:
-                result.append(torch.zeros_like(col))
+        # Scale active columns, zero dropped ones — vectorized
+        # mask_f: [n_columns, 1, 1, 1] broadcastable to [n_columns, B, T, d_col]
+        mask_f = mask.float() * scale
+        result = [col * mask_f[i] for i, col in enumerate(columns)]
 
         return result, mask

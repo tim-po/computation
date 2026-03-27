@@ -17,6 +17,9 @@
 
 set -e
 
+# Use TF32 tensor cores for any fp32 ops (slightly faster, negligible precision difference)
+export TORCH_FLOAT32_MATMUL_PRECISION=high
+
 echo "============================================"
 echo "H100 EXPERIMENT: Column Dropout at Scale"
 echo "============================================"
