@@ -117,7 +117,10 @@ def main():
 
     device = get_device()
     model = ColumnTransformerV2(config)
-    model.load_state_dict(torch.load(args.checkpoint, map_location=device, weights_only=True))
+    state_dict = torch.load(args.checkpoint, map_location=device, weights_only=True)
+    # Strip _orig_mod. prefix added by torch.compile
+    state_dict = {k.replace("_orig_mod.", ""): v for k, v in state_dict.items()}
+    model.load_state_dict(state_dict)
     model = model.to(device)
     model.eval()
     print(f"  Parameters: {count_parameters(model):,}")
