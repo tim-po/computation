@@ -46,6 +46,7 @@ def evaluate_with_columns(
     device: torch.device,
     active_columns: list[int],
     max_batches: int = 100,
+    use_bf16: bool = False,
 ) -> tuple[float, float]:
     """Evaluate model using only the specified active columns."""
     model.eval()
@@ -59,8 +60,9 @@ def evaluate_with_columns(
         input_ids = input_ids.to(device)
         targets = targets.to(device)
 
-        logits = model(input_ids, active_columns=active_columns)
-        loss = loss_fn(logits.view(-1, logits.size(-1)), targets.view(-1))
+        with torch.amp.autocast("cuda", enabled=use_bf16, dtype=torch.bfloat16):
+            logits = model(input_ids, active_columns=active_columns)
+        loss = loss_fn(logits.float().view(-1, logits.size(-1)), targets.view(-1))
         total_loss += loss.item()
         n_batches += 1
 
@@ -95,6 +97,7 @@ def main():
                         help="Sequence length (default: from config)")
     parser.add_argument("--max-batches", type=int, default=100,
                         help="Max validation batches per evaluation")
+    parser.add_argument("--bf16", action="store_true", help="Use bfloat16 for evaluation")
     parser.add_argument("--results-dir", type=str, default="results")
     args = parser.parse_args()
 
@@ -135,7 +138,7 @@ def main():
         ppls = []
 
         for subset in subsets:
-            loss, ppl = evaluate_with_columns(model, val_loader, device, subset, args.max_batches)
+            loss, ppl = evaluate_with_columns(model, val_loader, device, subset, args.max_batches, args.bf16)
             losses.append(loss)
             ppls.append(ppl)
 
