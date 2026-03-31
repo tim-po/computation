@@ -74,6 +74,8 @@ class ColumnConfigV2:
     dropout: float = 0.1
     col_drop_prob: float = 0.0  # column dropout probability (0 = disabled)
     min_active_columns: int = 1 # minimum columns kept alive during dropout
+    comm_rank: int = 0          # compressed cross-attn rank (0 = full, no compression)
+    quant_comm: bool = False    # simulate int8 quantization on compressed K/V
 
     @property
     def head_dim(self) -> int:
@@ -162,5 +164,77 @@ EXPERIMENTS = {
         n_heads=4, d_ff=1024, n_cross_heads=4,
         max_seq_len=1024, merge_every=3,
         col_drop_prob=0.5, min_active_columns=1,
+    ),
+    # =====================================================================
+    # H100 SCALE: 350M with compressed cross-attention (bandwidth reduction)
+    # =====================================================================
+    "h100_col8_comp64": ColumnConfigV2(
+        d_model=1024,
+        n_trunk_layers=4, trunk_n_heads=16, trunk_d_ff=4096,
+        n_columns=8, d_col=256, n_col_layers=12,
+        n_heads=4, d_ff=1024, n_cross_heads=4,
+        max_seq_len=1024, merge_every=3,
+        col_drop_prob=0.25, min_active_columns=2,
+        comm_rank=64,
+    ),
+    "h100_col8_comp32": ColumnConfigV2(
+        d_model=1024,
+        n_trunk_layers=4, trunk_n_heads=16, trunk_d_ff=4096,
+        n_columns=8, d_col=256, n_col_layers=12,
+        n_heads=4, d_ff=1024, n_cross_heads=4,
+        max_seq_len=1024, merge_every=3,
+        col_drop_prob=0.25, min_active_columns=2,
+        comm_rank=32,
+    ),
+    "h100_col8_comp64_q8": ColumnConfigV2(
+        d_model=1024,
+        n_trunk_layers=4, trunk_n_heads=16, trunk_d_ff=4096,
+        n_columns=8, d_col=256, n_col_layers=12,
+        n_heads=4, d_ff=1024, n_cross_heads=4,
+        max_seq_len=1024, merge_every=3,
+        col_drop_prob=0.25, min_active_columns=2,
+        comm_rank=64, quant_comm=True,
+    ),
+    # =====================================================================
+    # H100 SCALE: 1B params — validation before multi-GPU training
+    # Dataset: FineWeb-Edu (streaming) for diversity
+    # =====================================================================
+    "h100_1b_dense": DenseConfig(
+        d_model=2048, n_layers=22, n_heads=32, d_ff=4096,
+        max_seq_len=1024, dropout=0.1,
+    ),
+    "h100_1b_col8": ColumnConfigV2(
+        d_model=2048,
+        n_trunk_layers=6, trunk_n_heads=32, trunk_d_ff=8192,
+        n_columns=8, d_col=512, n_col_layers=16,
+        n_heads=8, d_ff=2048, n_cross_heads=8,
+        max_seq_len=1024, merge_every=4,
+        col_drop_prob=0.0, min_active_columns=8,
+    ),
+    "h100_1b_col8_drop25": ColumnConfigV2(
+        d_model=2048,
+        n_trunk_layers=6, trunk_n_heads=32, trunk_d_ff=8192,
+        n_columns=8, d_col=512, n_col_layers=16,
+        n_heads=8, d_ff=2048, n_cross_heads=8,
+        max_seq_len=1024, merge_every=4,
+        col_drop_prob=0.25, min_active_columns=2,
+    ),
+    "h100_1b_col8_comp64": ColumnConfigV2(
+        d_model=2048,
+        n_trunk_layers=6, trunk_n_heads=32, trunk_d_ff=8192,
+        n_columns=8, d_col=512, n_col_layers=16,
+        n_heads=8, d_ff=2048, n_cross_heads=8,
+        max_seq_len=1024, merge_every=4,
+        col_drop_prob=0.25, min_active_columns=2,
+        comm_rank=64,
+    ),
+    "h100_1b_col8_comp64_q8": ColumnConfigV2(
+        d_model=2048,
+        n_trunk_layers=6, trunk_n_heads=32, trunk_d_ff=8192,
+        n_columns=8, d_col=512, n_col_layers=16,
+        n_heads=8, d_ff=2048, n_cross_heads=8,
+        max_seq_len=1024, merge_every=4,
+        col_drop_prob=0.25, min_active_columns=2,
+        comm_rank=64, quant_comm=True,
     ),
 }

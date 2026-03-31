@@ -1,0 +1,51 @@
+{
+  "model": "h100_1b_col8_comp64_q8",
+  "bandwidth": {
+    "1": {
+      "per_merge_mb": 2.097152,
+      "total_mb": 8.388608,
+      "per_token_kb": 8.192,
+      "interconnects": {
+        "NVLink (900 GB/s)": {
+          "merge_ms": 0.0023301688888888892,
+          "total_ms": 0.009320675555555557
+        },
+        "PCIe 5.0 (64 GB/s)": {
+          "merge_ms": 0.032768000000000005,
+          "total_ms": 0.13107200000000002
+        },
+        "InfiniBand HDR (25 GB/s)": {
+          "merge_ms": 0.08388608,
+          "total_ms": 0.33554432
+        },
+        "100GbE (12.5 GB/s)": {
+          "merge_ms": 0.16777216,
+          "total_ms": 0.67108864
+        }
+      }
+    },
+    "8": {
+      "per_merge_mb": 16.777216,
+      "total_mb": 67.108864,
+      "per_token_kb": 8.192,
+      "interconnects": {
+        "NVLink (900 GB/s)": {
+          "merge_ms": 0.018641351111111114,
+          "total_ms": 0.07456540444444446
+        },
+        "PCIe 5.0 (64 GB/s)": {
+          "merge_ms": 0.26214400000000004,
+          "total_ms": 1.0485760000000002
+        },
+        "InfiniBand HDR (25 GB/s)": {
+          "merge_ms": 0.67108864,
+          "total_ms": 2.68435456
+        },
+        "100GbE (12.5 GB/s)": {
+          "merge_ms": 1.34217728,
+          "total_ms": 5.36870912
+        }
+      }
+    }
+  }
+}

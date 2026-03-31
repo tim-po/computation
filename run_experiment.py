@@ -38,6 +38,9 @@ def main():
                         help="Gradient accumulation steps (effective batch = batch-size * grad-accum)")
     parser.add_argument("--bf16", action="store_true", help="Use bfloat16 mixed precision")
     parser.add_argument("--compile", action="store_true", help="Use torch.compile")
+    parser.add_argument("--dataset", type=str, default="wikitext",
+                        choices=["wikitext", "fineweb-edu"],
+                        help="Dataset to use (default: wikitext)")
     parser.add_argument("--results-dir", type=str, default="results", help="Output directory")
     args = parser.parse_args()
 
@@ -61,9 +64,15 @@ def main():
     print("=" * 60)
 
     # Load data once (shared by all models)
-    train_loader, val_loader = load_wikitext(
-        seq_len=args.seq_len, batch_size=args.batch_size
-    )
+    if args.dataset == "fineweb-edu":
+        from column_transformer.data import load_fineweb_edu
+        train_loader, val_loader = load_fineweb_edu(
+            seq_len=args.seq_len, batch_size=args.batch_size
+        )
+    else:
+        train_loader, val_loader = load_wikitext(
+            seq_len=args.seq_len, batch_size=args.batch_size
+        )
 
     # Train each model
     all_results = []

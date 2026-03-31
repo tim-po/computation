@@ -125,6 +125,126 @@ class CrossColumnAttention(nn.Module):
         return outputs
 
 
+class CrossColumnAttentionCompressed(nn.Module):
+    """Bandwidth-efficient cross-column attention for distributed inference.
+
+    Same as CrossColumnAttention but compresses K/V to a low-rank bottleneck
+    before the "communication" step (aggregation). This simulates each GPU
+    compressing its K/V locally, sending the small tensor, then decompressing.
+
+    Communication cost per merge point drops from:
+        n_columns * 2 * B * T * d_col * dtype_bytes  (full)
+    to:
+        n_columns * 2 * B * T * comm_rank * dtype_bytes  (compressed)
+
+    With comm_rank=64 and d_col=512, that's an 8x reduction.
+    Optional int8 quantization of the compressed tensors gives another 2x.
+    """
+
+    def __init__(
+        self, n_columns: int, d_col: int, n_cross_heads: int = 4,
+        comm_rank: int = 64, quant_comm: bool = False, dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.n_columns = n_columns
+        self.d_col = d_col
+        self.n_cross_heads = n_cross_heads
+        self.head_dim = d_col // n_cross_heads
+        self.comm_rank = comm_rank
+        self.quant_comm = quant_comm
+        assert d_col % n_cross_heads == 0, "d_col must be divisible by n_cross_heads"
+
+        # Per-column K/V: project to d_col, then compress to comm_rank for "sending"
+        self.norms_kv = nn.ModuleList([nn.LayerNorm(d_col) for _ in range(n_columns)])
+        self.w_ks = nn.ModuleList([nn.Linear(d_col, d_col, bias=False) for _ in range(n_columns)])
+        self.w_vs = nn.ModuleList([nn.Linear(d_col, d_col, bias=False) for _ in range(n_columns)])
+
+        # Compression: d_col -> comm_rank (per-column, applied before "sending")
+        self.k_compress = nn.ModuleList([nn.Linear(d_col, comm_rank, bias=False) for _ in range(n_columns)])
+        self.v_compress = nn.ModuleList([nn.Linear(d_col, comm_rank, bias=False) for _ in range(n_columns)])
+
+        # Decompression: comm_rank -> d_col (shared, applied after "receiving" the average)
+        self.k_decompress = nn.Linear(comm_rank, d_col, bias=False)
+        self.v_decompress = nn.Linear(comm_rank, d_col, bias=False)
+
+        # Per-column Q and output projections (local, no communication needed)
+        self.norms_q = nn.ModuleList([nn.LayerNorm(d_col) for _ in range(n_columns)])
+        self.w_qs = nn.ModuleList([nn.Linear(d_col, d_col, bias=False) for _ in range(n_columns)])
+        self.w_os = nn.ModuleList([nn.Linear(d_col, d_col, bias=False) for _ in range(n_columns)])
+
+        self.attn_dropout = nn.Dropout(dropout)
+        self.resid_dropout = nn.Dropout(dropout)
+
+    @staticmethod
+    def _simulate_int8_quantize(x: torch.Tensor) -> torch.Tensor:
+        """Simulate int8 quantization noise without actually changing dtype.
+        Per-token absmax quantization: scale to [-127, 127], round, scale back."""
+        with torch.no_grad():
+            absmax = x.abs().amax(dim=-1, keepdim=True).clamp(min=1e-8)
+            scale = 127.0 / absmax
+        quantized = (x * scale).round() / scale
+        return quantized
+
+    def forward(
+        self, columns: list[torch.Tensor], col_mask: torch.Tensor | None = None
+    ) -> list[torch.Tensor]:
+        B, T, _ = columns[0].shape
+
+        if col_mask is None:
+            col_mask = torch.ones(self.n_columns, dtype=torch.bool, device=columns[0].device)
+
+        mask_f = col_mask.float()
+        n_active = mask_f.sum().clamp(min=1.0)
+
+        # --- "Local" computation on each GPU: K/V projection + compression ---
+        k_compressed_sum = torch.zeros(B, T, self.comm_rank, device=columns[0].device, dtype=columns[0].dtype)
+        v_compressed_sum = torch.zeros_like(k_compressed_sum)
+        for i in range(self.n_columns):
+            normed = self.norms_kv[i](columns[i])
+            k_full = self.w_ks[i](normed)
+            v_full = self.w_vs[i](normed)
+            # Compress before "sending" over network
+            k_c = self.k_compress[i](k_full) * mask_f[i]  # [B, T, comm_rank]
+            v_c = self.v_compress[i](v_full) * mask_f[i]
+            # Simulate int8 quantization of the compressed tensor
+            if self.quant_comm and self.training:
+                k_c = k_c + (self._simulate_int8_quantize(k_c) - k_c).detach()  # STE
+                v_c = v_c + (self._simulate_int8_quantize(v_c) - v_c).detach()
+            elif self.quant_comm:
+                k_c = self._simulate_int8_quantize(k_c)
+                v_c = self._simulate_int8_quantize(v_c)
+            k_compressed_sum = k_compressed_sum + k_c
+            v_compressed_sum = v_compressed_sum + v_c
+
+        # --- "Communication": only comm_rank-sized tensors are aggregated ---
+        k_compressed_avg = k_compressed_sum / n_active  # [B, T, comm_rank]
+        v_compressed_avg = v_compressed_sum / n_active
+
+        # --- "Receive" and decompress back to d_col ---
+        k = self.k_decompress(k_compressed_avg)  # [B, T, d_col]
+        v = self.v_decompress(v_compressed_avg)
+        k = k.view(B, T, self.n_cross_heads, self.head_dim).transpose(1, 2)
+        v = v.view(B, T, self.n_cross_heads, self.head_dim).transpose(1, 2)
+
+        # --- Per-column Q + attention (local, no communication) ---
+        outputs = []
+        for i in range(self.n_columns):
+            q = self.w_qs[i](self.norms_q[i](columns[i]))
+            q = q.view(B, T, self.n_cross_heads, self.head_dim).transpose(1, 2)
+
+            attn_out = F.scaled_dot_product_attention(
+                q, k, v, is_causal=True,
+                dropout_p=self.attn_dropout.p if self.training else 0.0,
+            )
+            attn_out = attn_out.transpose(1, 2).contiguous().view(B, T, self.d_col)
+            merged = columns[i] + self.resid_dropout(self.w_os[i](attn_out))
+
+            out = torch.where(col_mask[i], merged, columns[i])
+            outputs.append(out)
+
+        return outputs
+
+
 class ColumnDropout(nn.Module):
     """Drops entire columns during training to build fault tolerance.
 

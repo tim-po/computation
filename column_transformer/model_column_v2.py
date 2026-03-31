@@ -10,7 +10,7 @@ import torch.nn as nn
 
 from .config import ColumnConfigV2
 from .model_dense import TransformerBlock, RMSNorm, precompute_rope
-from .merge import CrossColumnAttention, ColumnDropout
+from .merge import CrossColumnAttention, CrossColumnAttentionCompressed, ColumnDropout
 
 
 class ColumnTransformerV2(nn.Module):
@@ -68,11 +68,20 @@ class ColumnTransformerV2(nn.Module):
         self.merge_layers = nn.ModuleDict()
         if config.merge_every > 0:
             for layer_idx in range(config.merge_every, config.n_col_layers + 1, config.merge_every):
-                self.merge_layers[str(layer_idx)] = CrossColumnAttention(
-                    config.n_columns, config.d_col,
-                    n_cross_heads=config.n_cross_heads,
-                    dropout=config.dropout,
-                )
+                if config.comm_rank > 0:
+                    self.merge_layers[str(layer_idx)] = CrossColumnAttentionCompressed(
+                        config.n_columns, config.d_col,
+                        n_cross_heads=config.n_cross_heads,
+                        comm_rank=config.comm_rank,
+                        quant_comm=config.quant_comm,
+                        dropout=config.dropout,
+                    )
+                else:
+                    self.merge_layers[str(layer_idx)] = CrossColumnAttention(
+                        config.n_columns, config.d_col,
+                        n_cross_heads=config.n_cross_heads,
+                        dropout=config.dropout,
+                    )
 
         # === Output: concat all columns -> project to d_model -> LM head ===
         self.out_proj = nn.Linear(config.total_col_dim, config.d_model, bias=False)
