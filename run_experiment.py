@@ -9,16 +9,22 @@ from column_transformer.config import DenseConfig, ColumnConfig, ColumnConfigV2,
 from column_transformer.model_dense import DenseTransformer
 from column_transformer.model_column import ColumnTransformer
 from column_transformer.model_column_v2 import ColumnTransformerV2
+from column_transformer.model_column_v2_fast import ColumnTransformerV2Fast
 from column_transformer.data import load_wikitext
 from column_transformer.train import train, count_parameters
 from column_transformer.evaluate import print_comparison
 from column_transformer.visualize import plot_training_curves, plot_final_comparison
+
+# Global flag set by --fast CLI arg
+_USE_FAST = False
 
 
 def build_model(name: str, config):
     if isinstance(config, DenseConfig):
         return DenseTransformer(config)
     elif isinstance(config, ColumnConfigV2):
+        if _USE_FAST:
+            return ColumnTransformerV2Fast(config)
         return ColumnTransformerV2(config)
     else:
         return ColumnTransformer(config)
@@ -38,11 +44,16 @@ def main():
                         help="Gradient accumulation steps (effective batch = batch-size * grad-accum)")
     parser.add_argument("--bf16", action="store_true", help="Use bfloat16 mixed precision")
     parser.add_argument("--compile", action="store_true", help="Use torch.compile")
+    parser.add_argument("--fast", action="store_true",
+                        help="Use vectorized (fast) column model — 3-5x faster on GPU")
     parser.add_argument("--dataset", type=str, default="wikitext",
                         choices=["wikitext", "fineweb-edu"],
                         help="Dataset to use (default: wikitext)")
     parser.add_argument("--results-dir", type=str, default="results", help="Output directory")
     args = parser.parse_args()
+
+    global _USE_FAST
+    _USE_FAST = args.fast
 
     os.makedirs(args.results_dir, exist_ok=True)
     os.makedirs("checkpoints", exist_ok=True)
