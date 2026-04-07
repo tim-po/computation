@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Column Transformer Platform</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-yellow: #d29922;
+            --accent-purple: #bc8cff;
+            --accent-orange: #f0883e;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; }
+
+        /* Header */
+        .header { background: var(--bg-secondary); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .header h1 { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .header h1 .logo { width: 24px; height: 24px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); border-radius: 6px; }
+        .header .status { display: flex; gap: 16px; align-items: center; font-size: 13px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+        .dot.green { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+        .dot.red { background: var(--accent-red); }
+        .dot.yellow { background: var(--accent-yellow); box-shadow: 0 0 6px var(--accent-yellow); }
+        .dot.blue { background: var(--accent-blue); box-shadow: 0 0 6px var(--accent-blue); }
+
+        /* Navigation */
+        .nav { background: var(--bg-secondary); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; gap: 0; }
+        .nav-tab { padding: 10px 20px; cursor: pointer; font-size: 14px; color: var(--text-secondary); border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .nav-tab:hover { color: var(--text-primary); }
+        .nav-tab.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+
+        /* Layout */
+        .container { max-width: 1600px; margin: 0 auto; padding: 20px 24px; }
+        .page { display: none; }
+        .page.active { display: block; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .full { grid-column: 1 / -1; }
+
+        /* Cards */
+        .card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+        .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--accent-blue); display: flex; align-items: center; gap: 8px; }
+        .card h3 { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary); }
+
+        /* Metric cards */
+        .metric { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
+        .metric .value { font-size: 28px; font-weight: 700; color: var(--accent-blue); line-height: 1.2; }
+        .metric .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 4px; }
+        .metric .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .metric.green .value { color: var(--accent-green); }
+        .metric.purple .value { color: var(--accent-purple); }
+        .metric.orange .value { color: var(--accent-orange); }
+        .metric.yellow .value { color: var(--accent-yellow); }
+
+        /* Buttons */
+        .btn { padding: 7px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); cursor: pointer; font-size: 13px; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn:hover { background: var(--border); }
+        .btn.primary { background: #238636; border-color: #238636; }
+        .btn.primary:hover { background: #2ea043; }
+        .btn.danger { background: #da3633; border-color: #da3633; }
+        .btn.danger:hover { background: var(--accent-red); }
+        .btn.blue { background: #1f6feb; border-color: #1f6feb; }
+        .btn.blue:hover { background: #388bfd; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+        /* Forms */
+        input, select, textarea { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 7px 12px; color: var(--text-primary); font-size: 13px; width: 100%; font-family: inherit; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
+        .field { margin-bottom: 12px; }
+        .field label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        .field-row { display: flex; gap: 12px; }
+        .field-row .field { flex: 1; }
+
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--bg-tertiary); font-size: 13px; }
+        th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+        tr:hover td { background: rgba(88,166,255,0.03); }
+
+        /* GPU Cards */
+        .gpu-card { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 10px; padding: 16px; transition: all 0.2s; position: relative; }
+        .gpu-card:hover { border-color: var(--accent-blue); }
+        .gpu-card.coordinator { border-color: var(--accent-green); background: rgba(63,185,80,0.05); }
+        .gpu-card.worker { border-color: var(--accent-blue); background: rgba(88,166,255,0.05); }
+        .gpu-card.training { border-color: var(--accent-yellow); background: rgba(210,153,34,0.05); }
+        .gpu-card .gpu-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+        .gpu-card .gpu-meta { font-size: 12px; color: var(--text-secondary); }
+        .gpu-card .gpu-role { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 8px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+        .gpu-card .gpu-role.coordinator { background: rgba(63,185,80,0.2); color: var(--accent-green); }
+        .gpu-card .gpu-role.worker { background: rgba(88,166,255,0.2); color: var(--accent-blue); }
+        .gpu-card .gpu-role.training { background: rgba(210,153,34,0.2); color: var(--accent-yellow); }
+        .gpu-card .gpu-role.idle { background: var(--bg-tertiary); color: var(--text-muted); }
+        .gpu-card .gpu-actions { margin-top: 10px; display: flex; gap: 6px; }
+        .gpu-card .remove-btn { position: absolute; top: 8px; right: 8px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; }
+        .gpu-card .remove-btn:hover { background: rgba(248,81,73,0.2); color: var(--accent-red); }
+
+        /* Memory bar */
+        .mem-bar { height: 6px; background: var(--bg-tertiary); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+        .mem-bar .fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+        .mem-bar .fill.low { background: var(--accent-green); }
+        .mem-bar .fill.mid { background: var(--accent-yellow); }
+        .mem-bar .fill.high { background: var(--accent-red); }
+
+        /* Column visualization */
+        .columns-viz { display: flex; gap: 6px; align-items: flex-end; justify-content: center; margin: 16px 0; }
+        .col-block { width: 40px; border-radius: 6px; text-align: center; font-size: 11px; font-weight: 700; color: white; transition: all 0.3s; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 60px; }
+        .col-block.active { background: linear-gradient(180deg, var(--accent-blue), #1f6feb); }
+        .col-block.inactive { background: var(--bg-tertiary); color: var(--text-muted); opacity: 0.4; }
+        .col-block .col-num { font-size: 16px; }
+        .col-block .col-type { font-size: 9px; opacity: 0.8; }
+
+        /* Output / Log boxes */
+        .output-box { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-family: 'SF Mono', 'Fira Code', Consolas, monospace; font-size: 13px; min-height: 100px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; line-height: 1.6; }
+        .output-box .prompt { color: var(--text-secondary); }
+        .output-box .generated { color: var(--accent-green); }
+
+        .log-box { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: 'SF Mono', Consolas, monospace; font-size: 12px; max-height: 250px; overflow-y: auto; }
+        .log-entry { padding: 2px 0; color: var(--text-muted); }
+        .log-entry.info { color: var(--accent-blue); }
+        .log-entry.success { color: var(--accent-green); }
+        .log-entry.error { color: var(--accent-red); }
+        .log-entry.warn { color: var(--accent-yellow); }
+
+        /* Charts */
+        .bar-chart .bar-row { display: flex; align-items: center; margin: 6px 0; }
+        .bar-chart .bar-label { width: 150px; font-size: 12px; color: var(--text-secondary); flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .bar-chart .bar-track { flex: 1; height: 26px; background: var(--bg-tertiary); border-radius: 5px; overflow: hidden; position: relative; }
+        .bar-chart .bar-fill { height: 100%; border-radius: 5px; transition: width 0.6s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; font-size: 11px; color: white; font-weight: 600; min-width: 40px; }
+        .bar-chart .bar-fill.blue { background: linear-gradient(90deg, #1f6feb, var(--accent-blue)); }
+        .bar-chart .bar-fill.green { background: linear-gradient(90deg, #238636, var(--accent-green)); }
+        .bar-chart .bar-fill.purple { background: linear-gradient(90deg, #8957e5, var(--accent-purple)); }
+        .bar-chart .bar-fill.orange { background: linear-gradient(90deg, #bd5600, var(--accent-orange)); }
+
+        /* Degradation chart (SVG-based) */
+        .svg-chart { width: 100%; }
+        .svg-chart text { fill: var(--text-secondary); font-size: 11px; }
+        .svg-chart .axis { stroke: var(--border); stroke-width: 1; }
+        .svg-chart .grid-line { stroke: var(--bg-tertiary); stroke-width: 1; stroke-dasharray: 4,4; }
+        .svg-chart .data-line { stroke: var(--accent-blue); stroke-width: 2.5; fill: none; }
+        .svg-chart .data-point { fill: var(--accent-blue); stroke: var(--bg-secondary); stroke-width: 2; }
+        .svg-chart .data-label { fill: var(--text-primary); font-size: 10px; font-weight: 600; }
+        .svg-chart .threshold { stroke: var(--accent-green); stroke-width: 1; stroke-dasharray: 6,3; }
+        .svg-chart .danger-zone { fill: rgba(248,81,73,0.08); }
+
+        /* Flex helpers */
+        .flex { display: flex; gap: 8px; align-items: center; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .flex-wrap { flex-wrap: wrap; }
+        .gap-12 { gap: 12px; }
+        .gap-16 { gap: 16px; }
+        .mt-8 { margin-top: 8px; }
+        .mt-12 { margin-top: 12px; }
+        .mt-16 { margin-top: 16px; }
+        .mt-20 { margin-top: 20px; }
+        .mb-8 { margin-bottom: 8px; }
+        .mb-16 { margin-bottom: 16px; }
+        .text-muted { color: var(--text-muted); font-size: 12px; }
+        .text-sm { font-size: 12px; }
+        .text-center { text-align: center; }
+
+        /* Badge */
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .badge.green { background: rgba(63,185,80,0.2); color: var(--accent-green); }
+        .badge.blue { background: rgba(88,166,255,0.2); color: var(--accent-blue); }
+        .badge.red { background: rgba(248,81,73,0.2); color: var(--accent-red); }
+        .badge.yellow { background: rgba(210,153,34,0.2); color: var(--accent-yellow); }
+
+        /* Spinner */
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Tooltip */
+        .tooltip { position: relative; }
+        .tooltip::after { content: attr(data-tip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: var(--bg-tertiary); color: var(--text-primary); padding: 4px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        .tooltip:hover::after { opacity: 1; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* Empty state */
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
+        .empty-state p { font-size: 14px; }
+
+        @media (max-width: 1200px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .grid-4 { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1><div class="logo"></div> Column Transformer Platform</h1>
+        <div class="status">
+            <span id="ws-status"><span class="dot red"></span> Offline</span>
+            <span id="gpu-count">0 GPUs</span>
+            <span id="model-badge"></span>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav">
+        <div class="nav-tab active" data-page="dashboard" onclick="showPage('dashboard')">Dashboard</div>
+        <div class="nav-tab" data-page="gpus" onclick="showPage('gpus')">GPUs</div>
+        <div class="nav-tab" data-page="inference" onclick="showPage('inference')">Inference</div>
+        <div class="nav-tab" data-page="training" onclick="showPage('training')">Training</div>
+        <div class="nav-tab" data-page="experiments" onclick="showPage('experiments')">Experiments</div>
+        <div class="nav-tab" data-page="logs" onclick="showPage('logs')">Logs</div>
+    </div>
+
+    <div class="container">
+        <!-- ======================================== -->
+        <!-- DASHBOARD PAGE -->
+        <!-- ======================================== -->
+        <div class="page active" id="page-dashboard">
+            <!-- Top metrics -->
+            <div class="grid-4 mb-16" id="top-metrics">
+                <div class="metric green">
+                    <div class="value" id="m-gpus">0</div>
+                    <div class="label">Connected GPUs</div>
+                </div>
+                <div class="metric">
+                    <div class="value" id="m-cols">0/8</div>
+                    <div class="label">Active Columns</div>
+                </div>
+                <div class="metric purple">
+                    <div class="value" id="m-tps">--</div>
+                    <div class="label">Tokens/sec</div>
+                </div>
+                <div class="metric orange">
+                    <div class="value" id="m-latency">--</div>
+                    <div class="label">Avg Latency (ms)</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Column Visualization -->
+                <div class="card">
+                    <h2>Column Status</h2>
+                    <div class="columns-viz" id="columns-viz"></div>
+                    <div class="text-center text-muted mt-8" id="col-status-text">No model loaded</div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="card">
+                    <h2>Quick Actions</h2>
+                    <div class="field">
+                        <label>Model Config</label>
+                        <select id="q-model-select"></select>
+                    </div>
+                    <div class="field">
+                        <label>Checkpoint Path</label>
+                        <input type="text" id="q-checkpoint" placeholder="/path/to/checkpoint.pt">
+                    </div>
+                    <div class="flex mt-12">
+                        <button class="btn primary" onclick="loadModel()">Load Model</button>
+                        <button class="btn danger" onclick="unloadModel()">Unload</button>
+                        <div style="flex:1"></div>
+                        <button class="btn" onclick="showPage('gpus')">Manage GPUs</button>
+                    </div>
+                </div>
+
+                <!-- Graceful Degradation Chart -->
+                <div class="card">
+                    <h2>Graceful Degradation</h2>
+                    <div id="degradation-chart"></div>
+                    <div class="text-muted mt-8">Perplexity vs. active columns (350M drop25 model)</div>
+                </div>
+
+                <!-- Bandwidth Analysis -->
+                <div class="card">
+                    <h2>Communication Bandwidth (1B Scale)</h2>
+                    <div class="bar-chart" id="bandwidth-chart"></div>
+                    <div class="text-muted mt-8">Data transfer per forward pass at different compression levels</div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="card full">
+                    <h2>Recent Activity</h2>
+                    <div class="log-box" id="activity-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================================== -->
+        <!-- GPUs PAGE -->
+        <!-- ======================================== -->
+        <div class="page" id="page-gpus">
+            <div class="flex-between mb-16">
+                <h2 style="font-size: 18px;">GPU Cluster Management</h2>
+                <div class="flex">
+                    <button class="btn" onclick="refreshGPUs()">Refresh All</button>
+                    <button class="btn primary" onclick="showAddGPU()">+ Add GPU</button>
+                </div>
+            </div>
+
+            <!-- Add GPU Form (hidden by default) -->
+            <div class="card mb-16" id="add-gpu-form" style="display:none;">
+                <h2>Add Remote GPU</h2>
+                <div class="field-row">
+                    <div class="field">
+                        <label>SSH Target (user@host)</label>
+                        <input type="text" id="gpu-ssh-target" placeholder="root@gpu1.vast.ai">
+                    </div>
+                    <div class="field" style="max-width:120px;">
+                        <label>SSH Port</label>
+                        <input type="number" id="gpu-ssh-port" value="22">
+                    </div>
+                    <div class="field" style="max-width:200px; display:flex; align-items:flex-end;">
+                        <button class="btn primary" onclick="addGPU()">Connect</button>
+                        <button class="btn ml-8" onclick="hideAddGPU()" style="margin-left:8px;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GPU Grid -->
+            <div class="grid-3" id="gpu-grid">
+                <div class="empty-state full">
+                    <div class="icon">GPU</div>
+                    <p>No GPUs connected. Click "Add GPU" to connect a remote machine.</p>
+                </div>
+            </div>
+
+            <!-- Distributed Control -->
+            <div class="card mt-20">
+                <h2>Distributed Inference Control</h2>
+                <div class="field-row">
+                    <div class="field">
+                        <label>Model Config</label>
+                        <select id="dist-model"></select>
+                    </div>
+                    <div class="field">
+                        <label>Checkpoint Path (on coordinator)</label>
+                        <input type="text" id="dist-checkpoint" placeholder="h100_col8_drop25_best.pt">
+                    </div>
+                    <div class="field" style="max-width:120px;">
+                        <label>Port</label>
+                        <input type="number" id="dist-port" value="8384">
+                    </div>
+                </div>
+                <div class="flex mt-12">
+                    <button class="btn primary" onclick="startDistributed()">Start Inference</button>
+                    <button class="btn danger" onclick="stopDistributed()">Stop All</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================================== -->
+        <!-- INFERENCE PAGE -->
+        <!-- ======================================== -->
+        <div class="page" id="page-inference">
+            <!-- Live Inference Status Banner -->
+            <div class="card mb-16" id="inference-status-banner" style="display:none;">
+                <div class="flex-between">
+                    <div>
+                        <h2 style="margin:0;">Distributed Inference Active</h2>
+                        <div class="gpu-meta mt-4" id="inf-status-detail">--</div>
+                    </div>
+                    <div class="flex" style="gap:12px;align-items:center;">
+                        <div id="inf-col-viz" class="flex" style="gap:4px;"></div>
+                        <span class="badge green" id="inf-status-badge">LIVE</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card mb-16" id="inference-no-model" style="">
+                <div class="flex-between" style="align-items:center;">
+                    <div>
+                        <h2 style="margin:0;color:var(--yellow);">No Model Loaded</h2>
+                        <div class="gpu-meta mt-4">Load a model on the Dashboard or start distributed inference on the GPUs page.</div>
+                    </div>
+                    <button class="btn" onclick="showPage('dashboard')">Go to Dashboard</button>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Text Generation -->
+                <div class="card">
+                    <h2>Text Generation</h2>
+                    <div class="field">
+                        <label>Prompt</label>
+                        <textarea id="gen-prompt" rows="3" placeholder="The future of artificial intelligence is">The future of artificial intelligence is</textarea>
+                    </div>
+                    <div class="field-row">
+                        <div class="field">
+                            <label>Max Tokens</label>
+                            <input type="number" id="gen-max-tokens" value="50">
+                        </div>
+                        <div class="field">
+                            <label>Temperature</label>
+                            <input type="number" id="gen-temp" value="0.8" step="0.1" min="0" max="2">
+                        </div>
+                    </div>
+                    <button class="btn primary mt-8" onclick="generate()" id="gen-btn">Generate</button>
+
+                    <div class="output-box mt-16" id="gen-output">
+                        <span class="text-muted">Generated text will appear here...</span>
+                    </div>
+                    <div class="flex-between mt-8">
+                        <span class="text-muted" id="gen-stats"></span>
+                    </div>
+                </div>
+
+                <!-- Benchmark -->
+                <div class="card">
+                    <h2>Forward Pass Benchmark</h2>
+                    <div class="field-row">
+                        <div class="field">
+                            <label>Sequence Length</label>
+                            <input type="number" id="bench-seq" value="128">
+                        </div>
+                        <div class="field">
+                            <label>Forward Passes</label>
+                            <input type="number" id="bench-n" value="5">
+                        </div>
+                    </div>
+                    <button class="btn primary mt-8" onclick="runBenchmark()" id="bench-btn">Run Benchmark</button>
+
+                    <div id="bench-result" class="mt-16"></div>
+
+                    <h3 class="mt-20">Benchmark History</h3>
+                    <div class="bar-chart mt-8" id="bench-history-chart"></div>
+                </div>
+
+                <!-- Inference History -->
+                <div class="card full">
+                    <h2>Inference History</h2>
+                    <table>
+                        <thead>
+                            <tr><th>Time</th><th>Model</th><th>Columns</th><th>Tokens</th><th>tok/s</th><th>Latency</th><th>Prompt</th></tr>
+                        </thead>
+                        <tbody id="inference-history-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================================== -->
+        <!-- TRAINING PAGE -->
+        <!-- ======================================== -->
+        <div class="page" id="page-training">
+            <div class="grid-2">
+                <div class="card">
+                    <h2>Launch Training Job</h2>
+                    <div class="field">
+                        <label>GPU</label>
+                        <select id="train-gpu"></select>
+                    </div>
+                    <div class="field">
+                        <label>Model Config</label>
+                        <select id="train-model"></select>
+                    </div>
+                    <div class="field-row">
+                        <div class="field">
+                            <label>Dataset</label>
+                            <select id="train-dataset">
+                                <option value="wikitext">WikiText-103</option>
+                                <option value="fineweb">FineWeb-Edu</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Steps</label>
+                            <input type="number" id="train-steps" value="10000">
+                        </div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field">
+                            <label>Batch Size</label>
+                            <input type="number" id="train-bs" value="8">
+                        </div>
+                        <div class="field">
+                            <label>Learning Rate</label>
+                            <input type="text" id="train-lr" value="3e-4">
+                        </div>
+                    </div>
+                    <button class="btn primary mt-12" onclick="launchTraining()">Launch Training</button>
+                </div>
+
+                <div class="card">
+                    <h2>Active Training Jobs</h2>
+                    <div class="text-muted mb-8" id="training-auto-status" style="font-size:12px;"></div>
+                    <div id="training-jobs"></div>
+                </div>
+
+                <!-- Training History -->
+                <div class="card full">
+                    <h2>Training History</h2>
+                    <table>
+                        <thead>
+                            <tr><th>Job ID</th><th>Model</th><th>Dataset</th><th>Steps</th><th>Loss</th><th>Val Loss</th><th>Status</th><th>GPU</th></tr>
+                        </thead>
+                        <tbody id="training-history-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================================== -->
+        <!-- EXPERIMENTS PAGE -->
+        <!-- ======================================== -->
+        <div class="page" id="page-experiments">
+            <!-- Experiment Comparison -->
+            <div class="card mb-16">
+                <h2>Experiment Results Comparison</h2>
+                <div class="text-muted mb-8">All validated experiment results across scales</div>
+                <table>
+                    <thead>
+                        <tr><th>Name</th><th>Config</th><th>Params</th><th>PPL</th><th>Val Loss</th><th>Dataset</th><th>Steps</th><th>Cols</th><th>Dropout</th><th>Compression</th><th>Notes</th></tr>
+                    </thead>
+                    <tbody id="experiments-table"></tbody>
+                </table>
+            </div>
+
+            <div class="grid-2">
+                <!-- Perplexity Comparison -->
+                <div class="card">
+                    <h2>Perplexity Comparison</h2>
+                    <div class="bar-chart" id="ppl-comparison-chart"></div>
+                </div>
+
+                <!-- Degradation Curve -->
+                <div class="card">
+                    <h2>Graceful Degradation Curve</h2>
+                    <div id="degradation-detail-chart"></div>
+                </div>
+
+                <!-- Bandwidth Analysis Table -->
+                <div class="card full">
+                    <h2>Communication Bandwidth Analysis (1B Scale)</h2>
+                    <div class="grid-2 gap-16">
+                        <div>
+                            <h3>Data per Forward Pass</h3>
+                            <table id="bandwidth-table"></table>
+                        </div>
+                        <div>
+                            <h3>Latency by Interconnect</h3>
+                            <table id="latency-table"></table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Key Findings -->
+                <div class="card full">
+                    <h2>Key Research Findings</h2>
+                    <div class="grid-3 gap-16">
+                        <div class="metric green">
+                            <div class="value">-0.4%</div>
+                            <div class="label">25% Col Dropout vs Dense (350M)</div>
+                            <div class="sub">Dropout acts as regularizer</div>
+                        </div>
+                        <div class="metric">
+                            <div class="value">0.00</div>
+                            <div class="label">PPL diff: 8x Compression (1B)</div>
+                            <div class="sub">Rank-64 identical to uncompressed</div>
+                        </div>
+                        <div class="metric orange">
+                            <div class="value">+10%</div>
+                            <div class="label">PPL with 50% Columns Lost</div>
+                            <div class="sub">4/8 columns = graceful degradation</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================================== -->
+        <!-- LOGS PAGE -->
+        <!-- ======================================== -->
+        <div class="page" id="page-logs">
+            <div class="card">
+                <h2>System Event Log</h2>
+                <div class="flex mb-8">
+                    <button class="btn btn-sm" onclick="clearLogs()">Clear</button>
+                </div>
+                <div class="log-box" id="system-log" style="max-height:600px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ================================================================
+    // State
+    // ================================================================
+    let ws = null;
+    let gpus = {};
+    let benchResults = [];
+    let experiments = [];
+    let degradationData = null;
+    let bandwidthData = null;
+    let models = [];
+
+    // ================================================================
+    // Navigation
+    // ================================================================
+    function showPage(name) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('page-' + name).classList.add('active');
+        document.querySelector(`.nav-tab[data-page="${name}"]`).classList.add('active');
+
+        // Load page-specific data
+        if (name === 'experiments') loadExperimentsPage();
+        if (name === 'gpus') refreshGPUs();
+        if (name === 'training') { refreshTrainingJobs(); refreshGPUs(); }
+        if (name === 'inference') refreshStatus();
+        if (name === 'dashboard') refreshStatus();
+    }
+
+    // ================================================================
+    // WebSocket
+    // ================================================================
+    function connectWS() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${proto}//${location.host}/ws`);
+        ws.onopen = () => {
+            document.getElementById('ws-status').innerHTML = '<span class="dot green"></span> Online';
+            addLog('Connected to server', 'success');
+        };
+        ws.onclose = () => {
+            document.getElementById('ws-status').innerHTML = '<span class="dot red"></span> Offline';
+            setTimeout(connectWS, 3000);
+        };
+        ws.onmessage = (e) => {
+            const msg = JSON.parse(e.data);
+            handleEvent(msg.event, msg.data);
+        };
+    }
+
+    function handleEvent(event, data) {
+        switch (event) {
+            case 'gpu_added':
+                addLog(`GPU connected: ${data.gpu_name} (${data.id})`, 'success');
+                refreshGPUs();
+                refreshStatus();
+                break;
+            case 'gpu_removed':
+                addLog(`GPU removed: ${data.id}`, 'info');
+                refreshGPUs();
+                refreshStatus();
+                break;
+            case 'model_loaded':
+                addLog(`Model loaded: ${data.model} (${(data.params/1e6).toFixed(1)}M params)`, 'success');
+                refreshStatus();
+                break;
+            case 'model_unloaded':
+                addLog('Model unloaded', 'info');
+                refreshStatus();
+                break;
+            case 'inference_complete':
+                addLog(`Generated ${data.tokens_generated} tokens at ${data.tokens_per_sec.toFixed(1)} tok/s`, 'success');
+                updateMetrics(data);
+                break;
+            case 'benchmark_complete':
+                addLog(`Benchmark: ${data.avg_latency_ms.toFixed(1)}ms, ${data.tokens_per_sec.toFixed(0)} tok/s`, 'success');
+                updateMetrics(data);
+                break;
+            case 'distributed_started':
+                addLog(`Distributed inference started: ${data.model} on ${data.workers.length + 1} GPUs`, 'success');
+                refreshGPUs();
+                refreshStatus();
+                break;
+            case 'distributed_stopped':
+                addLog('Distributed inference stopped', 'info');
+                refreshGPUs();
+                refreshStatus();
+                break;
+            case 'training_stopped':
+                addLog(`Training stopped: ${data.job_id}`, 'info');
+                refreshTrainingJobs();
+                break;
+            case 'training_started':
+                addLog(`Training started: ${data.model} (job: ${data.job_id})`, 'success');
+                refreshTrainingJobs();
+                break;
+        }
+    }
+
+    // ================================================================
+    // API Helper
+    // ================================================================
+    async function api(method, path, body = null) {
+        const opts = { method, headers: { 'Content-Type': 'application/json' } };
+        if (body) opts.body = JSON.stringify(body);
+        const res = await fetch(`/api${path}`, opts);
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: res.statusText }));
+            throw new Error(err.detail || 'Request failed');
+        }
+        return res.json();
+    }
+
+    // ================================================================
+    // Status & Metrics
+    // ================================================================
+    async function refreshStatus() {
+        try {
+            const s = await api('GET', '/status');
+            document.getElementById('m-gpus').textContent = s.n_gpus;
+            document.getElementById('m-cols').textContent = `${s.n_workers + (s.coordinator_active ? 1 : 0)}/${8}`;
+            document.getElementById('gpu-count').textContent = `${s.n_gpus} GPUs`;
+
+            if (s.loaded_model) {
+                document.getElementById('model-badge').innerHTML = `<span class="badge green">${s.loaded_model}</span>`;
+            } else {
+                document.getElementById('model-badge').innerHTML = '';
+            }
+
+            updateColumnViz(s);
+            updateInferenceStatus(s);
+        } catch (e) { /* ignore */ }
+    }
+
+    function updateInferenceStatus(s) {
+        const banner = document.getElementById('inference-status-banner');
+        const noModel = document.getElementById('inference-no-model');
+        const activeCols = s.n_workers + (s.coordinator_active ? 1 : 0);
+
+        if (s.loaded_model || s.coordinator_active || activeCols > 0) {
+            banner.style.display = 'block';
+            noModel.style.display = 'none';
+            const detail = document.getElementById('inf-status-detail');
+            detail.textContent = `${s.loaded_model || 'Model'} | ${activeCols} active columns | ${s.n_gpus} GPUs connected${s.active_training_jobs > 0 ? ' | ' + s.active_training_jobs + ' training job(s)' : ''}`;
+
+            let colHtml = '';
+            for (let i = 0; i < 8; i++) {
+                const on = i < activeCols;
+                colHtml += `<div style="width:20px;height:20px;border-radius:4px;background:${on ? 'var(--green)' : 'var(--bg-card)'};border:1px solid ${on ? 'var(--green)' : 'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:10px;color:${on ? '#000' : 'var(--text-muted)'};">${i}</div>`;
+            }
+            document.getElementById('inf-col-viz').innerHTML = colHtml;
+            document.getElementById('inf-status-badge').textContent = s.coordinator_active ? 'LIVE' : 'READY';
+            document.getElementById('inf-status-badge').className = `badge ${s.coordinator_active ? 'green' : 'yellow'}`;
+        } else {
+            banner.style.display = 'none';
+            noModel.style.display = 'block';
+        }
+    }
+
+    function updateMetrics(data) {
+        if (data.tokens_per_sec) document.getElementById('m-tps').textContent = data.tokens_per_sec.toFixed(1);
+        if (data.avg_latency_ms) document.getElementById('m-latency').textContent = data.avg_latency_ms.toFixed(0);
+    }
+
+    function updateColumnViz(status) {
+        const viz = document.getElementById('columns-viz');
+        let html = '';
+        for (let i = 0; i < 8; i++) {
+            const active = i < (status.n_workers + (status.coordinator_active ? 1 : 0));
+            html += `<div class="col-block ${active ? 'active' : 'inactive'}">
+                <div class="col-num">${i}</div>
+                <div class="col-type">${i === 0 ? 'COORD' : (active ? 'WORKER' : 'OFF')}</div>
+            </div>`;
+        }
+        viz.innerHTML = html;
+        document.getElementById('col-status-text').textContent =
+            status.loaded_model ? `${status.loaded_model} - ${status.n_workers + (status.coordinator_active ? 1 : 0)} active columns` : 'No model loaded';
+    }
+
+    // ================================================================
+    // Models
+    // ================================================================
+    async function loadModels() {
+        try {
+            models = await api('GET', '/models/available');
+            const columnModels = models.filter(m => m.type === 'ColumnConfigV2');
+
+            ['q-model-select', 'dist-model', 'train-model'].forEach(id => {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                sel.innerHTML = '';
+                const allModels = id === 'train-model' ? models : columnModels;
+                allModels.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.name;
+                    const params = m.params_estimate ? `${(m.params_estimate/1e6).toFixed(0)}M` : '';
+                    const cols = m.n_columns ? `, ${m.n_columns} cols` : '';
+                    opt.textContent = `${m.name} (${params}${cols})`;
+                    sel.appendChild(opt);
+                });
+            });
+        } catch (e) { addLog('Failed to load models: ' + e.message, 'error'); }
+    }
+
+    async function loadModel() {
+        const config = document.getElementById('q-model-select').value;
+        const checkpoint = document.getElementById('q-checkpoint').value;
+        if (!checkpoint) { alert('Enter a checkpoint path'); return; }
+
+        addLog(`Loading model ${config}...`, 'info');
+        try {
+            const r = await api('POST', '/models/load', {
+                config_name: config, checkpoint_path: checkpoint, device: 'auto'
+            });
+            addLog(`Loaded: ${r.model} (${(r.params/1e6).toFixed(1)}M params)`, 'success');
+            refreshStatus();
+        } catch (e) { addLog('Load failed: ' + e.message, 'error'); }
+    }
+
+    async function unloadModel() {
+        try {
+            await api('POST', '/models/unload');
+            refreshStatus();
+            addLog('Model unloaded', 'info');
+        } catch (e) { addLog('Unload failed: ' + e.message, 'error'); }
+    }
+
+    // ================================================================
+    // GPU Management
+    // ================================================================
+    function showAddGPU() { document.getElementById('add-gpu-form').style.display = 'block'; }
+    function hideAddGPU() { document.getElementById('add-gpu-form').style.display = 'none'; }
+
+    async function addGPU() {
+        const target = document.getElementById('gpu-ssh-target').value.trim();
+        const port = parseInt(document.getElementById('gpu-ssh-port').value);
+        if (!target) { alert('Enter SSH target'); return; }
+
+        addLog(`Connecting to ${target}:${port}...`, 'info');
+        try {
+            const gpu = await api('POST', '/gpus/add', { ssh_target: target, ssh_port: port });
+            addLog(`Connected: ${gpu.gpu_name} (${gpu.gpu_memory_mb}MB)`, 'success');
+            hideAddGPU();
+            document.getElementById('gpu-ssh-target').value = '';
+            refreshGPUs();
+            refreshStatus();
+        } catch (e) { addLog('Connect failed: ' + e.message, 'error'); }
+    }
+
+    async function removeGPU(id) {
+        if (!confirm(`Remove GPU ${id}?`)) return;
+        try {
+            await api('DELETE', '/gpus/' + encodeURIComponent(id));
+            refreshGPUs();
+            refreshStatus();
+        } catch (e) { addLog('Remove failed: ' + e.message, 'error'); }
+    }
+
+    async function refreshGPUs() {
+        try {
+            const list = await api('GET', '/gpus');
+            gpus = {};
+            list.forEach(g => gpus[g.id] = g);
+            renderGPUGrid(list);
+            updateGPUSelects(list);
+        } catch (e) { /* ignore */ }
+    }
+
+    function renderGPUGrid(list) {
+        const grid = document.getElementById('gpu-grid');
+        if (list.length === 0) {
+            grid.innerHTML = '<div class="empty-state full"><div class="icon">GPU</div><p>No GPUs connected. Click "Add GPU" to connect remote machines via SSH.</p></div>';
+            return;
+        }
+        let html = '';
+        list.forEach(g => {
+            const roleClass = g.role === 'idle' ? '' : g.role;
+            const memUsed = g.gpu_memory_mb - g.gpu_memory_free_mb;
+            const memPct = g.gpu_memory_mb > 0 ? (memUsed / g.gpu_memory_mb * 100) : 0;
+            const memColor = memPct > 80 ? 'high' : memPct > 50 ? 'mid' : 'low';
+            html += `<div class="gpu-card ${roleClass}">
+                <button class="remove-btn" onclick="removeGPU('${g.id}')" title="Remove">&times;</button>
+                <div class="gpu-name">${g.gpu_name || 'Unknown GPU'}</div>
+                <div class="gpu-meta">${g.ssh_target}:${g.ssh_port}</div>
+                <div class="gpu-meta">${memUsed}/${g.gpu_memory_mb} MB | Util: ${g.gpu_utilization}%</div>
+                <div class="mem-bar"><div class="fill ${memColor}" style="width:${memPct}%"></div></div>
+                <div class="gpu-role ${g.role}">${g.role}${g.column_idx >= 0 ? ' (col ' + g.column_idx + ')' : ''}</div>
+                <div class="gpu-actions">
+                    <button class="btn btn-sm" onclick="viewGPULogs('${g.id}')">Logs</button>
+                    <button class="btn btn-sm" onclick="viewNvidiaSmi('${g.id}')">nvidia-smi</button>
+                </div>
+            </div>`;
+        });
+        grid.innerHTML = html;
+    }
+
+    function updateGPUSelects(list) {
+        const sel = document.getElementById('train-gpu');
+        if (sel) {
+            sel.innerHTML = '<option value="">Select GPU...</option>';
+            list.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = g.id;
+                opt.textContent = `${g.gpu_name} (${g.ssh_target})`;
+                sel.appendChild(opt);
+            });
+        }
+    }
+
+    async function viewNvidiaSmi(id) {
+        try {
+            const r = await api('GET', `/gpus/${encodeURIComponent(id)}/nvidia-smi`);
+            alert(r.output);
+        } catch (e) { alert('Error: ' + e.message); }
+    }
+
+    async function viewGPULogs(id) {
+        const gpu = gpus[id];
+        const logType = gpu.role === 'coordinator' ? 'coordinator' : 'worker';
+        try {
+            const r = await api('GET', `/gpus/${encodeURIComponent(id)}/logs/${logType}`);
+            alert(r.log || 'No logs found');
+        } catch (e) { alert('Error: ' + e.message); }
+    }
+
+    // ================================================================
+    // Distributed Inference
+    // ================================================================
+    async function startDistributed() {
+        const gpuList = Object.values(gpus).filter(g => g.status === 'connected');
+        if (gpuList.length < 2) { alert('Need at least 2 GPUs (1 coordinator + 1 worker)'); return; }
+
+        const model = document.getElementById('dist-model').value;
+        const checkpoint = document.getElementById('dist-checkpoint').value;
+        const port = parseInt(document.getElementById('dist-port').value);
+
+        const coordId = gpuList[0].id;
+        const workerIds = gpuList.slice(1).map(g => g.id);
+
+        addLog(`Starting distributed: coord=${coordId}, workers=${workerIds.length}`, 'info');
+        try {
+            const r = await api('POST', '/distributed/start', {
+                coordinator_gpu_id: coordId,
+                worker_gpu_ids: workerIds,
+                config_name: model,
+                checkpoint_path: checkpoint,
+                coordinator_port: port,
+            });
+            addLog(`Distributed started! External port: ${r.external_port}`, 'success');
+            refreshGPUs();
+        } catch (e) { addLog('Start failed: ' + e.message, 'error'); }
+    }
+
+    async function stopDistributed() {
+        try {
+            await api('POST', '/distributed/stop');
+            addLog('Distributed inference stopped', 'info');
+            refreshGPUs();
+        } catch (e) { addLog('Stop failed: ' + e.message, 'error'); }
+    }
+
+    // ================================================================
+    // Inference
+    // ================================================================
+    async function generate() {
+        const btn = document.getElementById('gen-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Generating...';
+
+        const prompt = document.getElementById('gen-prompt').value;
+        const maxTokens = parseInt(document.getElementById('gen-max-tokens').value);
+        const temperature = parseFloat(document.getElementById('gen-temp').value);
+
+        try {
+            const r = await api('POST', '/inference/generate', {
+                prompt, max_tokens: maxTokens, temperature
+            });
+
+            document.getElementById('gen-output').innerHTML =
+                `<span class="prompt">${esc(r.prompt)}</span><span class="generated">${esc(r.output)}</span>`;
+            document.getElementById('gen-stats').textContent =
+                `${r.tokens_generated} tokens | ${r.tokens_per_sec.toFixed(1)} tok/s | ${r.total_time_s.toFixed(1)}s | ${r.active_columns}/${r.total_columns} columns`;
+
+            document.getElementById('m-tps').textContent = r.tokens_per_sec.toFixed(1);
+        } catch (e) { addLog('Generation failed: ' + e.message, 'error'); }
+        finally {
+            btn.disabled = false;
+            btn.textContent = 'Generate';
+        }
+    }
+
+    async function runBenchmark() {
+        const btn = document.getElementById('bench-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Running...';
+
+        const seqLen = parseInt(document.getElementById('bench-seq').value);
+        const nForward = parseInt(document.getElementById('bench-n').value);
+
+        try {
+            const r = await api('POST', '/benchmark/run', { seq_len: seqLen, n_forward: nForward });
+            benchResults.push(r);
+
+            document.getElementById('bench-result').innerHTML = `
+                <div class="grid-3 gap-16">
+                    <div class="metric"><div class="value">${r.tokens_per_sec.toFixed(0)}</div><div class="label">tokens/sec</div></div>
+                    <div class="metric"><div class="value">${r.avg_latency_ms.toFixed(1)}</div><div class="label">avg latency (ms)</div></div>
+                    <div class="metric"><div class="value">${r.active_columns}/${r.total_columns}</div><div class="label">active columns</div></div>
+                </div>`;
+
+            document.getElementById('m-tps').textContent = r.tokens_per_sec.toFixed(0);
+            document.getElementById('m-latency').textContent = r.avg_latency_ms.toFixed(0);
+            updateBenchHistory();
+        } catch (e) { addLog('Benchmark failed: ' + e.message, 'error'); }
+        finally {
+            btn.disabled = false;
+            btn.textContent = 'Run Benchmark';
+        }
+    }
+
+    function updateBenchHistory() {
+        const chart = document.getElementById('bench-history-chart');
+        if (benchResults.length === 0) { chart.innerHTML = '<div class="text-muted">No benchmark data</div>'; return; }
+        const maxTps = Math.max(...benchResults.map(r => r.tokens_per_sec));
+        const colors = ['blue', 'green', 'purple', 'orange'];
+        let html = '';
+        benchResults.forEach((r, i) => {
+            const pct = (r.tokens_per_sec / maxTps * 100).toFixed(0);
+            html += `<div class="bar-row">
+                <div class="bar-label">${r.active_columns}col seq=${r.seq_len}</div>
+                <div class="bar-track"><div class="bar-fill ${colors[i % 4]}" style="width:${pct}%">${r.tokens_per_sec.toFixed(0)} tok/s</div></div>
+            </div>`;
+        });
+        chart.innerHTML = html;
+    }
+
+    // ================================================================
+    // Training
+    // ================================================================
+    async function launchTraining() {
+        const gpuId = document.getElementById('train-gpu').value;
+        const model = document.getElementById('train-model').value;
+        const dataset = document.getElementById('train-dataset').value;
+        const steps = parseInt(document.getElementById('train-steps').value);
+        const bs = parseInt(document.getElementById('train-bs').value);
+        const lr = parseFloat(document.getElementById('train-lr').value);
+
+        if (!gpuId) { alert('Select a GPU'); return; }
+
+        addLog(`Launching training: ${model} on ${gpuId}`, 'info');
+        try {
+            const r = await api('POST', '/training/launch', {
+                gpu_id: gpuId, config_name: model, dataset, steps, batch_size: bs, learning_rate: lr
+            });
+            addLog(`Training launched: ${r.id}`, 'success');
+            refreshTrainingJobs();
+        } catch (e) { addLog('Launch failed: ' + e.message, 'error'); }
+    }
+
+    let trainingPollInterval = null;
+
+    async function refreshTrainingJobs() {
+        try {
+            const jobs = await api('GET', '/training/jobs');
+            const container = document.getElementById('training-jobs');
+            const statusEl = document.getElementById('training-auto-status');
+            const historyTable = document.getElementById('training-history-table');
+
+            const runningJobs = jobs.filter(j => j.status === 'running');
+            const doneJobs = jobs.filter(j => j.status !== 'running');
+
+            // Auto-poll: refresh status of running jobs and poll every 5s
+            if (runningJobs.length > 0) {
+                statusEl.textContent = `Auto-refreshing every 5s (${runningJobs.length} running)`;
+                if (!trainingPollInterval) {
+                    trainingPollInterval = setInterval(async () => {
+                        for (const j of runningJobs) {
+                            try { await api('GET', `/training/${j.id}/status`); } catch (e) {}
+                        }
+                        refreshTrainingJobs();
+                    }, 5000);
+                }
+            } else {
+                statusEl.textContent = '';
+                if (trainingPollInterval) {
+                    clearInterval(trainingPollInterval);
+                    trainingPollInterval = null;
+                }
+            }
+
+            // Render active jobs
+            if (runningJobs.length === 0) {
+                container.innerHTML = '<div class="text-muted text-center" style="padding:20px;">No active training jobs</div>';
+            } else {
+                let html = '';
+                for (const j of runningJobs) {
+                    const progress = j.steps > 0 ? (j.current_step / j.steps * 100).toFixed(0) : 0;
+                    const elapsed = j.started_at ? ((Date.now()/1000 - j.started_at) / 60).toFixed(0) : 0;
+                    const eta = (j.current_step > 0 && j.steps > 0) ?
+                        (((Date.now()/1000 - j.started_at) / j.current_step * (j.steps - j.current_step)) / 60).toFixed(0) : '--';
+                    html += `<div class="gpu-card mb-8" style="border-color:var(--yellow);">
+                        <div class="flex-between">
+                            <div class="gpu-name">${j.model_config}</div>
+                            <span class="badge yellow">TRAINING</span>
+                        </div>
+                        <div class="gpu-meta mt-8">
+                            <strong>Step ${j.current_step.toLocaleString()}/${j.steps.toLocaleString()}</strong> (${progress}%)
+                            | Loss: <strong style="color:${j.current_loss < 3.5 ? 'var(--green)' : 'var(--yellow)'}">${j.current_loss.toFixed(4)}</strong>
+                            | Best Val: ${j.best_val_loss < 999 ? `<strong style="color:var(--green)">${j.best_val_loss.toFixed(4)}</strong>` : '--'}
+                        </div>
+                        <div class="gpu-meta mt-4">
+                            Dataset: ${j.dataset} | GPU: ${j.gpu_id} | Elapsed: ${elapsed}m | ETA: ${eta}m
+                        </div>
+                        <div class="mem-bar mt-8"><div class="fill low" style="width:${progress}%;transition:width 0.5s ease;"></div></div>
+                        <div class="flex mt-8" style="gap:8px;">
+                            <button class="btn btn-sm" onclick="checkTrainingStatus('${j.id}')">Refresh Now</button>
+                            <button class="btn btn-sm danger" onclick="stopTraining('${j.id}')">Stop</button>
+                        </div>
+                        ${j.log_tail ? `<pre class="output-box mt-8" style="max-height:120px;font-size:11px;overflow-y:auto;">${esc(j.log_tail)}</pre>` : ''}
+                    </div>`;
+                }
+                container.innerHTML = html;
+            }
+
+            // Render history table
+            if (doneJobs.length > 0 && historyTable) {
+                historyTable.innerHTML = doneJobs.map(j => {
+                    const badge = j.status === 'completed' ? 'green' : 'red';
+                    const dur = (j.finished_at && j.started_at) ? ((j.finished_at - j.started_at) / 60).toFixed(1) + 'm' : '--';
+                    return `<tr>
+                        <td>${j.id.slice(0, 8)}</td>
+                        <td>${j.model_config}</td>
+                        <td>${j.dataset}</td>
+                        <td>${j.current_step}/${j.steps}</td>
+                        <td>${j.current_loss.toFixed(4)}</td>
+                        <td>${j.best_val_loss < 999 ? j.best_val_loss.toFixed(4) : '--'}</td>
+                        <td><span class="badge ${badge}">${j.status}</span> (${dur})</td>
+                        <td style="font-size:11px;">${j.gpu_id}</td>
+                    </tr>`;
+                }).join('');
+            } else if (historyTable) {
+                historyTable.innerHTML = '<tr><td colspan="8" class="text-muted text-center">No completed jobs</td></tr>';
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    async function checkTrainingStatus(jobId) {
+        try {
+            await api('GET', `/training/${jobId}/status`);
+            refreshTrainingJobs();
+        } catch (e) { addLog('Status check failed: ' + e.message, 'error'); }
+    }
+
+    async function stopTraining(jobId) {
+        if (!confirm('Stop this training job?')) return;
+        try {
+            await api('POST', `/training/${jobId}/stop`);
+            refreshTrainingJobs();
+        } catch (e) { addLog('Stop failed: ' + e.message, 'error'); }
+    }
+
+    // ================================================================
+    // Experiments & Charts
+    // ================================================================
+    async function loadExperimentsPage() {
+        await Promise.all([loadExperiments(), loadDegradation(), loadBandwidth()]);
+        renderExperimentsTable();
+        renderPPLComparison();
+        renderDegradationChart('degradation-detail-chart');
+        renderBandwidthTables();
+    }
+
+    async function loadExperiments() {
+        try { experiments = await api('GET', '/experiments'); } catch (e) { /* ignore */ }
+    }
+
+    async function loadDegradation() {
+        try { degradationData = await api('GET', '/experiments/degradation'); } catch (e) { /* ignore */ }
+    }
+
+    async function loadBandwidth() {
+        try { bandwidthData = await api('GET', '/experiments/bandwidth'); } catch (e) { /* ignore */ }
+    }
+
+    function renderExperimentsTable() {
+        const tbody = document.getElementById('experiments-table');
+        let html = '';
+        experiments.forEach(e => {
+            const paramsStr = e.params >= 1e9 ? `${(e.params/1e9).toFixed(1)}B` : `${(e.params/1e6).toFixed(0)}M`;
+            html += `<tr>
+                <td><strong>${e.name}</strong></td>
+                <td class="text-muted">${e.model_config}</td>
+                <td>${paramsStr}</td>
+                <td><strong>${e.perplexity.toFixed(2)}</strong></td>
+                <td>${e.val_loss.toFixed(4)}</td>
+                <td>${e.dataset}</td>
+                <td>${e.steps.toLocaleString()}</td>
+                <td>${e.n_columns || '-'}</td>
+                <td>${e.col_drop_prob > 0 ? (e.col_drop_prob * 100) + '%' : '-'}</td>
+                <td>${e.comm_rank > 0 ? 'rank-' + e.comm_rank : '-'}</td>
+                <td class="text-muted">${e.notes || ''}</td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+    }
+
+    function renderPPLComparison() {
+        const chart = document.getElementById('ppl-comparison-chart');
+        if (experiments.length === 0) { chart.innerHTML = '<div class="text-muted">No data</div>'; return; }
+
+        const maxPPL = Math.max(...experiments.map(e => e.perplexity));
+        const colors = ['blue', 'green', 'purple', 'orange', 'blue', 'green', 'purple', 'orange', 'blue'];
+        let html = '';
+        experiments.forEach((e, i) => {
+            const pct = (e.perplexity / maxPPL * 100).toFixed(0);
+            html += `<div class="bar-row">
+                <div class="bar-label" title="${e.name}">${e.name}</div>
+                <div class="bar-track"><div class="bar-fill ${colors[i % colors.length]}" style="width:${pct}%">${e.perplexity.toFixed(2)}</div></div>
+            </div>`;
+        });
+        chart.innerHTML = html;
+    }
+
+    function renderDegradationChart(containerId) {
+        const container = document.getElementById(containerId);
+        if (!degradationData) { container.innerHTML = '<div class="text-muted">Loading...</div>'; return; }
+
+        const data = degradationData.data;
+        const W = 500, H = 280, pad = { top: 20, right: 30, bottom: 40, left: 55 };
+        const plotW = W - pad.left - pad.right;
+        const plotH = H - pad.top - pad.bottom;
+
+        const xMin = 0, xMax = 9;
+        const yMin = 16, yMax = 40;
+
+        const x = (v) => pad.left + ((v - xMin) / (xMax - xMin)) * plotW;
+        const y = (v) => pad.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+
+        let svg = `<svg class="svg-chart" viewBox="0 0 ${W} ${H}">`;
+
+        // Danger zone (above 20% degradation)
+        const dangerY = y(18.43 * 1.2);
+        svg += `<rect class="danger-zone" x="${pad.left}" y="${pad.top}" width="${plotW}" height="${dangerY - pad.top}" rx="4"/>`;
+
+        // Grid lines
+        for (let v = 20; v <= 36; v += 4) {
+            svg += `<line class="grid-line" x1="${pad.left}" y1="${y(v)}" x2="${W-pad.right}" y2="${y(v)}"/>`;
+            svg += `<text x="${pad.left - 8}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+        }
+
+        // X axis labels
+        data.forEach(d => {
+            svg += `<text x="${x(d.active_columns)}" y="${H - 8}" text-anchor="middle">${d.active_columns}</text>`;
+        });
+        svg += `<text x="${W/2}" y="${H}" text-anchor="middle" style="font-size:10px;">Active Columns</text>`;
+        svg += `<text x="12" y="${H/2}" text-anchor="middle" transform="rotate(-90, 12, ${H/2})" style="font-size:10px;">Perplexity</text>`;
+
+        // 10% threshold line
+        const threshold = 18.43 * 1.1;
+        svg += `<line class="threshold" x1="${pad.left}" y1="${y(threshold)}" x2="${W-pad.right}" y2="${y(threshold)}"/>`;
+        svg += `<text x="${W-pad.right+2}" y="${y(threshold)+4}" style="fill:var(--accent-green);font-size:9px;">+10%</text>`;
+
+        // Data line
+        let path = '';
+        data.forEach((d, i) => {
+            const px = x(d.active_columns);
+            const py = y(d.perplexity);
+            path += (i === 0 ? 'M' : 'L') + `${px},${py}`;
+        });
+        svg += `<path class="data-line" d="${path}"/>`;
+
+        // Data points
+        data.forEach(d => {
+            const px = x(d.active_columns);
+            const py = y(d.perplexity);
+            svg += `<circle class="data-point" cx="${px}" cy="${py}" r="4"/>`;
+            svg += `<text class="data-label" x="${px}" y="${py - 10}" text-anchor="middle">${d.perplexity.toFixed(1)}</text>`;
+        });
+
+        svg += '</svg>';
+        container.innerHTML = svg;
+    }
+
+    function renderBandwidthTables() {
+        if (!bandwidthData) return;
+
+        // Variants table
+        const vTable = document.getElementById('bandwidth-table');
+        let vHtml = '<thead><tr><th>Variant</th><th>Per Merge</th><th>Total</th><th>Compression</th></tr></thead><tbody>';
+        bandwidthData.variants.forEach(v => {
+            vHtml += `<tr><td>${v.name}</td><td>${v.per_merge_mb} MB</td><td>${v.total_mb} MB</td><td><strong>${v.compression}</strong></td></tr>`;
+        });
+        vHtml += '</tbody>';
+        vTable.innerHTML = vHtml;
+
+        // Latency table
+        const lTable = document.getElementById('latency-table');
+        let lHtml = '<thead><tr><th>Interconnect</th><th>Full</th><th>Rank-64</th><th>Rank-64+int8</th></tr></thead><tbody>';
+        bandwidthData.latency_by_interconnect.forEach(l => {
+            lHtml += `<tr><td>${l.interconnect}</td><td>${l.full_ms}ms</td><td>${l.rank64_ms}ms</td><td><strong>${l.rank64_int8_ms}ms</strong></td></tr>`;
+        });
+        lHtml += '</tbody>';
+        lTable.innerHTML = lHtml;
+    }
+
+    // Dashboard charts
+    async function loadDashboardCharts() {
+        await Promise.all([loadDegradation(), loadBandwidth()]);
+        renderDegradationChart('degradation-chart');
+        renderDashboardBandwidth();
+    }
+
+    function renderDashboardBandwidth() {
+        const chart = document.getElementById('bandwidth-chart');
+        if (!bandwidthData) { chart.innerHTML = ''; return; }
+
+        const colors = ['orange', 'blue', 'green'];
+        let html = '';
+        const maxMB = Math.max(...bandwidthData.variants.map(v => v.total_mb));
+        bandwidthData.variants.forEach((v, i) => {
+            const pct = (v.total_mb / maxMB * 100).toFixed(0);
+            html += `<div class="bar-row">
+                <div class="bar-label">${v.name}</div>
+                <div class="bar-track"><div class="bar-fill ${colors[i]}" style="width:${pct}%">${v.total_mb} MB (${v.compression})</div></div>
+            </div>`;
+        });
+        chart.innerHTML = html;
+    }
+
+    // ================================================================
+    // Logging
+    // ================================================================
+    function addLog(msg, type = '') {
+        const time = new Date().toLocaleTimeString();
+        const entry = `<div class="log-entry ${type}">[${time}] ${msg}</div>`;
+
+        // Add to activity log (dashboard)
+        const actLog = document.getElementById('activity-log');
+        if (actLog) { actLog.innerHTML += entry; actLog.scrollTop = actLog.scrollHeight; }
+
+        // Add to system log
+        const sysLog = document.getElementById('system-log');
+        if (sysLog) { sysLog.innerHTML += entry; sysLog.scrollTop = sysLog.scrollHeight; }
+    }
+
+    function clearLogs() {
+        document.getElementById('system-log').innerHTML = '';
+    }
+
+    // ================================================================
+    // Helpers
+    // ================================================================
+    function esc(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ================================================================
+    // Init
+    // ================================================================
+    window.addEventListener('load', () => {
+        connectWS();
+        loadModels();
+        refreshStatus();
+        loadDashboardCharts();
+        setInterval(() => { if (ws && ws.readyState === 1) ws.send('ping'); }, 30000);
+        setInterval(refreshStatus, 10000);
+    });
+    </script>
+</body>
+</html>

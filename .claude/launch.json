@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web-platform",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "web.server", "--port", "8001"],
+      "port": 8001
+    }
+  ]
+}
