@@ -1,0 +1,20 @@
+graph TD
+    In[Input Hidden State] --> Split
+    
+    subgraph "Layers N to N+3 (No Communication)"
+        Split -->|Attention Heads 1-4| G1[GPU 1: Slice]
+        Split -->|Attention Heads 5-8| G2[GPU 2: Slice]
+        Split -->|Attention Heads 9-12| G3[GPU 3: Slice]
+        Split -->|Attention Heads 13-16| G4[GPU 4: Slice]
+    end
+    
+    G1 --> CCA
+    G2 --> CCA
+    G3 --> CCA
+    G4 --> CCA
+    
+    subgraph "Layer N+4"
+        CCA{Sparse CCA Correction / Merge}
+    end
+    
+    CCA --> Out[Next Block]

@@ -1,0 +1,24 @@
+model:
+  id: Qwen/Qwen3-4B
+  n_layers: 36
+  hidden_size: 2560
+  n_heads: 32
+  n_kv_heads: 8
+  head_dim: 80
+  layer_types: null   # all full_attention (standard Qwen3)
+
+split:
+  n_gpu: 2
+  full_attn_layers: null   # all layers (auto-detect from model)
+  cca_layers: [0, 4, 8, 12, 16, 20, 24, 28, 32]   # 9 sync points (~every 4 layers)
+
+network:
+  topology: lan
+  latency_one_way_ms: 1.0
+  bandwidth_gbps: 10.0
+
+benchmark:
+  prompt_len: 32
+  n_decode_tokens: 100
+  n_warmup: 3
+  n_runs: 5

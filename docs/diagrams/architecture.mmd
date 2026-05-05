@@ -1,0 +1,22 @@
+graph TD
+    A[Local Draft / Core Path] -->|Draft Window / Candidate Set C| B(Remote Fresh Verifier 1)
+    A -->|Draft Window / Candidate Set C| C(Remote Fresh Verifier 2)
+    A -->|Draft Window / Candidate Set C| D(Remote Fresh Verifier N)
+    
+    B -->|Acceptance / Sparse Refinement| E{Aggregator / Consensus}
+    C -->|Acceptance / Sparse Refinement| E
+    D -->|Acceptance / Sparse Refinement| E
+    
+    E -->|Accepted Tokens| F[Next Token]
+    
+    subgraph "Decentralized Network (Consumer GPUs)"
+    B
+    C
+    D
+    end
+    
+    subgraph "Local Device"
+    A
+    E
+    F
+    end

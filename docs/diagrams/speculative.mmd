@@ -1,0 +1,9 @@
+sequenceDiagram
+    participant Local as Local Draft (Weak GPU)
+    participant Remote as Remote Verifier (Strong GPU)
+    
+    Note over Local: Generate tokens 1-10 (50ms)
+    Local->>Remote: Send Draft Window [T1..T10] (Ping: 50ms)
+    Note over Remote: Parallel Verification (50ms)
+    Remote-->>Local: Accept T1..T8, Correct T9 (Ping: 50ms)
+    Note over Local: Add 9 tokens to context.<br/>Total time: 200ms.<br/>Speed: 45 tok/s!

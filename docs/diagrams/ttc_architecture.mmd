@@ -1,0 +1,30 @@
+graph TD
+    %% Local Device (Client)
+    subgraph "Local Device (Client)"
+        Input[Input Context / Prompt] --> Stem
+        Stem[Local Stem / Draft Model] --> Draft[Draft Tokens: T1, T2, T3]
+        Stem --> Context[Context Vector / KV]
+        
+        Draft --> Aggregator
+        Context --> Aggregator
+        
+        Aggregator{Acceptance / Tree Search} --> Output[Accepted Tokens]
+    end
+
+    %% P2P Network (Remote Workers)
+    subgraph "P2P Network (Stateless Verifiers)"
+        Context --> |Ping: 50ms| W1
+        Context --> |Ping: 50ms| W2
+        Context --> |Ping: 50ms| W3
+        
+        W1[Worker 1: TTC Block Predicts T+1] --> |Ping: 50ms| Aggregator
+        W2[Worker 2: TTC Block Predicts T+2] --> |Ping: 50ms| Aggregator
+        W3[Worker 3: TTC Block Predicts T+3] --> |Ping: 50ms| Aggregator
+    end
+
+    %% Styling
+    classDef local fill:#e1f5fe,stroke:#311b92,stroke-width:2px;
+    classDef remote fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    
+    class Input,Stem,Draft,Context,Aggregator,Output local;
+    class W1,W2,W3 remote;

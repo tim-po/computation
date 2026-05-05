@@ -1,0 +1,26 @@
+model:
+  id: Qwen/Qwen3.5-0.8B
+  n_layers: 24
+  hidden_size: 1024
+  n_heads: 8
+  n_kv_heads: 2
+  head_dim: 256
+  layer_types: [linear, linear, linear, full, linear, linear, linear, full,
+                linear, linear, linear, full, linear, linear, linear, full,
+                linear, linear, linear, full, linear, linear, linear, full]
+
+split:
+  n_gpu: 2
+  full_attn_layers: [3, 7, 11, 15, 19, 23]
+  cca_layers: [0, 3, 7, 11, 15, 19, 23]
+
+network:
+  topology: wan
+  latency_one_way_ms: 25.0   # intercity WAN
+  bandwidth_gbps: 1.0
+
+benchmark:
+  prompt_len: 32
+  n_decode_tokens: 100
+  n_warmup: 3
+  n_runs: 5

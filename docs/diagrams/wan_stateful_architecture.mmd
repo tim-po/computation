@@ -1,0 +1,54 @@
+flowchart TD
+    Client[Client 0 VRAM] --> Gateway[Gateway / Key Controller / Session Router]
+
+    subgraph GatewayNode["Gateway can be a productive node"]
+        Gateway
+        Draft[Draft model 0.5B optional]
+        Router[Latency and quality router]
+        Keys[Session keys and boundary ops]
+    end
+
+    Gateway --> Draft
+    Draft --> Window[Draft window + draft logprobs]
+    Gateway --> Router
+    Gateway --> Keys
+
+    subgraph P2P["P2P consumer GPU pool"]
+        W1[Key-locked Stateful Worker 1.5B]
+        W2[Key-locked Stateful Worker 7B]
+        W3[Key-locked Stateful Worker 7B replica]
+        W4[Strong Worker 14B/32B oracle]
+        Cache[Encoded KV snapshot store]
+    end
+
+    Keys -->|encode boundary tokens| Window
+    Window --> W1
+    Window --> W2
+    Window --> W3
+
+    W1 -->|encoded KV cache lives here| W1
+    W2 -->|encoded KV cache lives here| W2
+    W3 -->|encoded KV cache lives here| W3
+    W1 -.->|snapshot| Cache
+    W2 -.->|snapshot| Cache
+    Cache -.->|warm failover| W3
+    W4 -->|slow async verification| Gateway
+
+    W1 -->|encoded accepted prefix| Gateway
+    W2 -->|encoded accepted prefix| Gateway
+    W3 -->|race response| Gateway
+
+    Router -->|escalate hard prompts| W4
+    Keys -->|decode / sample| Gateway
+    Gateway --> Stream[Stream accepted tokens]
+    Stream --> Client
+
+    classDef client fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef gateway fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+    classDef worker fill:#fff3e0,stroke:#ef6c00,stroke-width:2px;
+    classDef oracle fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px;
+
+    class Client,Stream client;
+    class Gateway,Draft,Router,Window,Keys gateway;
+    class W1,W2,W3,Cache worker;
+    class W4 oracle;

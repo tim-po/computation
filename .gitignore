@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# PyTorch / model weights
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# HuggingFace datasets cache
+experiments/data/
+experiments/cache/
+~/.cache/huggingface/
+
+# Training outputs
+experiments/results/*.json
+experiments/results/*.png
+experiments/results/*.txt
+
+# macOS
+.DS_Store
+._*
+
+# Secrets
+.env
+*.env.*
+
+# IDE
+.vscode/
+.idea/
